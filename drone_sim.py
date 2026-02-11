@@ -69,7 +69,7 @@ def load_data():
         return pd.DataFrame(data)
 
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="drone_sim_performance_fix")
+    geolocator = Nominatim(user_agent="drone_sim_performance_final")
     try:
         location = geolocator.geocode(f"{zip_code}, USA")
         if location: return [location.latitude, location.longitude]
@@ -143,16 +143,18 @@ with right_col:
                     head_c1, head_c2 = st.columns([1.8, 1])
                     head_c1.markdown(f"**{row['model']}**")
                     status_placeholder = head_c2.empty()
+                    
+                    # REORDERED COLUMNS: On Scene | ETA | MPH | Battery
                     m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
                         'specs': row,
                         'status_text': status_placeholder,
                         'speed_bar': st.progress(0),
-                        'metric_speed': m1.empty(),
-                        'metric_batt': m2.empty(),
-                        'metric_eta': m3.empty(),
-                        'metric_hover': m4.empty(),
+                        'metric_hover': m1.empty(), # ON SCENE FIRST
+                        'metric_eta': m2.empty(),   # ETA SECOND
+                        'metric_speed': m3.empty(), # MPH THIRD
+                        'metric_batt': m4.empty(),  # BATTERY LAST
                     }
                     drone_ui_elements.append(ui_obj)
                     st.divider()
@@ -214,13 +216,12 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             'curr_v': 0, 'drain': drain
         })
 
-    # PERFORMANCE RANKING (Longest Flight = Green, Middle = Yellow, Shortest = Red)
     valid = [d for d in fleet_sim_data if d['possible']]
-    valid.sort(key=lambda x: x['t_total'], reverse=True) # Longest total time is best
+    valid.sort(key=lambda x: x['t_total'], reverse=True) 
     for i, d in enumerate(valid):
-        if i == 0: d['perf_color'] = "#00ff00" # Best (Green)
-        elif i == 1: d['perf_color'] = "#ffff00" # Middle (Yellow)
-        else: d['perf_color'] = "#ff0000" # Shortest (Red)
+        if i == 0: d['perf_color'] = "#00ff00" 
+        elif i == 1: d['perf_color'] = "#ffff00" 
+        else: d['perf_color'] = "#ff0000" 
 
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
@@ -237,26 +238,26 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             if curr_time < d['t_out']:
                 phase_txt, eta, target_v = ">> OUT", d['t_out'] - curr_time, d['tgt_speed']
             elif curr_time < (d['t_out'] + d['t_hov']):
-                phase_txt, site_time, target_v = "HOVER", curr_time - d['t_out'], 0
+                phase_txt, site_time, target_v = "ON SCENE", curr_time - d['t_out'], 0
             elif curr_time < d['t_total']:
                 phase_txt, eta, site_time, target_v = "<< RTB", d['t_total'] - curr_time, d['t_hov'], d['tgt_speed']
             else:
                 phase_txt, phase_col, site_time, target_v = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov'], 0
                 d['curr_v'] = 0
 
-            # Acceleration Logic
-            if d['curr_v'] < target_v: d['curr_v'] += 1
-            elif d['curr_v'] > target_v: d['curr_v'] -= 1
+            # SCALED ACCELERATION (Faster Spool-up: +4 MPH per tick)
+            if d['curr_v'] < target_v: d['curr_v'] = min(target_v, d['curr_v'] + 4)
+            elif d['curr_v'] > target_v: d['curr_v'] = max(target_v, d['curr_v'] - 4)
             
             ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
             ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
             ui['metric_eta'].metric("ETA", f"{int(eta/60):02d}:{int(eta%60):02d}")
-            ui['metric_hover'].metric("SITE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
+            ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
             # Battery Logic
             used = (min(curr_time, d['t_out']) * d['drain']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + (max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out'])) * d['drain'])
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
-            ui['metric_batt'].metric("BAT", f"{int(pct)}%")
+            ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
-        time.sleep(0.16) # Twice as slow
+        time.sleep(0.16)
