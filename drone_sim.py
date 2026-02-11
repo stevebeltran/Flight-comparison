@@ -14,24 +14,24 @@ st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_s
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
     <style>
-    /* 1. HIDE STREAMLIT HEADER/TOOLBAR */
+    /* 1. HIDE STREAMLIT HEADER */
     header[data-testid="stHeader"] {
         display: none;
     }
     
-    /* 2. GLOBAL DARK THEME & SPACING */
+    /* 2. DARK THEME */
     .stApp {
         background-color: #050505 !important;
         color: #e0e0e0;
     }
     
-    /* 3. ADJUST TOP PADDING */
+    /* 3. PADDING */
     .block-container {
         padding-top: 3rem !important;
         padding-bottom: 1rem !important;
     }
     
-    /* 4. REMOVE PADDING BETWEEN BLOCKS */
+    /* 4. COMPACT SPACING */
     div.stVerticalBlock > div {
         gap: 0.5rem !important;
     }
@@ -108,7 +108,7 @@ def load_data():
         return pd.DataFrame(data)
 
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="drone_sim_clean")
+    geolocator = Nominatim(user_agent="drone_sim_final_v2")
     try:
         location = geolocator.geocode(f"{zip_code}, USA")
         if location: return [location.latitude, location.longitude]
@@ -149,7 +149,8 @@ with right_col:
     if st.session_state.step == 1:
         with st.form(key='zip_form'):
             c_in, c_btn = st.columns([2,1])
-            zip_in = c_in.text_input("ZIP", placeholder="90210", label_visibility="collapsed")
+            # CHANGED: Placeholder is now 61047
+            zip_in = c_in.text_input("ZIP", placeholder="61047", label_visibility="collapsed")
             if c_btn.form_submit_button("INIT"):
                 if zip_in:
                     coords = get_lat_lon_from_zip(zip_in)
@@ -183,15 +184,70 @@ with right_col:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             st.success(f"Target: {dist:.2f} mi")
 
-        # DRONE FLEET
+        # DRONE FLEET SETUP
         if st.session_state.step == 3:
             df = load_data()
-            drone_ui_elements = [] 
             
+            # --- PRE-CALCULATION FOR RENAMING ---
+            # We need to calculate times FIRST to determine ranking/names
+            # Then we render the UI elements with those new names.
+            temp_sim_data = []
             for index, row in df.iterrows():
+                # Quick Physics Calc for Ranking
+                if st.session_state.burst_mode: max_v = float(row['max_speed_mph'])
+                else: max_v = float(row['speed_mph'])
+                
+                speed_mps = max_v / 3600
+                t_out = dist / speed_mps
+                
+                batt_sec = float(row['flight_time_min']) * 60
+                usable = batt_sec * 0.80
+                cost = (t_out * 2) * (float(row['burst_drain_factor']) if st.session_state.burst_mode else 1.0)
+                
+                hover_sec = usable - cost
+                possible = True
+                if st.session_state.wind_speed > float(row['max_wind_mph']): possible = False
+                elif hover_sec < 0: possible = False
+                
+                total_time = (t_out * 2) + (hover_sec if possible else 0)
+                
+                temp_sim_data.append({
+                    'index': index,
+                    'specs': row,
+                    't_total': total_time,
+                    'possible': possible
+                })
+            
+            # SORT AND ASSIGN NAMES
+            # Filter possible missions for valid ranking
+            valid_missions = [d for d in temp_sim_data if d['possible']]
+            valid_missions.sort(key=lambda x: x['t_total'])
+            
+            # Create a lookup for ranks
+            rank_map = {} # index -> (Name, Color)
+            for i, d in enumerate(valid_missions):
+                if i == 0: rank_map[d['index']] = ("RED ONE", "#ff0000")
+                elif i == 1: rank_map[d['index']] = ("YELLOW TWO", "#ffff00")
+                else: rank_map[d['index']] = ("GREEN THREE", "#00ff00")
+            
+            # UI GENERATION LOOP
+            drone_ui_elements = [] 
+            for d_data in temp_sim_data:
+                idx = d_data['index']
+                row = d_data['specs']
+                
+                # Get Assigned Name (or fallback if it failed)
+                if idx in rank_map:
+                    display_name = f"{rank_map[idx][0]} ({row['model']})"
+                    display_color = rank_map[idx][1]
+                else:
+                    display_name = f"GROUNDED ({row['model']})"
+                    display_color = "#888888"
+
                 with st.container():
-                    head_c1, head_c2 = st.columns([1.5, 1])
-                    head_c1.markdown(f"**{row['model']}**")
+                    # Colored Header
+                    head_c1, head_c2 = st.columns([1.8, 1])
+                    head_c1.markdown(f"<span style='color:{display_color}; font-weight:bold'>{display_name}</span>", unsafe_allow_html=True)
                     status_placeholder = head_c2.empty()
                     
                     m1, m2, m3, m4 = st.columns(4)
@@ -204,6 +260,7 @@ with right_col:
                         'metric_batt': m2.empty(),
                         'metric_eta': m3.empty(),
                         'metric_hover': m4.empty(),
+                        'rank_color': display_color
                     }
                     drone_ui_elements.append(ui_obj)
                     ui_obj['speed_bar'] = st.progress(0)
@@ -258,20 +315,14 @@ with left_col:
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
-    # --- MAP INTERACTION LOGIC ---
     if map_data['last_clicked']:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
-        
-        # LOGIC:
-        # 1. Base not set? Set Base.
-        # 2. Base set? Set/Move Target AND Reset Wind (New Mission Profile).
-        
         if not st.session_state.base:
             st.session_state.base = coords
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
-            generate_weather()  # <--- RESET WIND ON NEW TARGET
+            generate_weather()
             st.session_state.step = 3
             st.rerun()
         
@@ -286,7 +337,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
     fleet_sim_data = []
     
-    # 1. Physics & Limits
+    # 1. Physics
     for drone in drone_ui_elements:
         specs = drone['specs']
         
@@ -337,16 +388,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             'drain': drain
         })
 
-    # 2. Ranking Colors (Red=Fastest, Yellow=2nd, Green=3rd)
+    # 2. Simulation Loop
     valid = [d for d in fleet_sim_data if d['possible']]
-    valid.sort(key=lambda x: x['t_total'])
-    
-    for i, d in enumerate(valid):
-        if i == 0: d['color'] = "#ff0000" # RED (1st)
-        elif i == 1: d['color'] = "#ffff00" # YELLOW (2nd)
-        else: d['color'] = "#00ff00" # GREEN (3rd)
-
-    # 3. Loop
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
     for tick in range(101):
@@ -365,7 +408,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 continue
             
             phase_txt = ""
-            phase_col = "#00ffff" # Neutral Start
+            phase_col = "#00ffff"
             eta = 0
             site_time = 0
             target_v = 0
@@ -384,23 +427,23 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 site_time = d['t_hov']
                 target_v = d['tgt_speed']
             else:
-                phase_txt = "DONE"
-                # REVEAL COLOR ON LANDING
-                phase_col = d.get('color', '#00ff00')
+                # DONE STATUS
+                phase_txt = "✓ SECURE" # Removed "DONE"
+                phase_col = ui['rank_color'] # Reveal Rank Color
                 site_time = d['t_hov']
                 target_v = 0
                 d['curr_v'] = 0 
             
-            # Smooth Speed
+            # Speed Calc
             if d['curr_v'] < target_v: d['curr_v'] += 1
             elif d['curr_v'] > target_v: d['curr_v'] -= 1
             if d['curr_v'] < 0: d['curr_v'] = 0
             
+            # Render
             ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
             
             ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
-            
             ui['metric_eta'].metric("ETA", f"{int(eta/60):02d}:{int(eta%60):02d}")
             ui['metric_hover'].metric("SITE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
@@ -419,4 +462,5 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BAT", f"{int(pct)}%")
 
-        time.sleep(0.08)
+        # DOUBLED DURATION: 0.08 -> 0.16
+        time.sleep(0.16)
