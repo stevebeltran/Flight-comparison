@@ -11,24 +11,34 @@ import random
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
 
-# --- CUSTOM CSS: COMPACT COCKPIT THEME ---
+# --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
     <style>
-    /* 1. GLOBAL DARK THEME & TIGHT SPACING */
-    .stApp, .block-container {
+    /* 1. HIDE STREAMLIT HEADER/TOOLBAR */
+    header[data-testid="stHeader"] {
+        display: none;
+    }
+    
+    /* 2. GLOBAL DARK THEME & SPACING */
+    .stApp {
         background-color: #050505 !important;
         color: #e0e0e0;
-        padding-top: 1rem !important; /* Remove huge top padding */
     }
     
-    /* 2. REMOVE STREAMLIT PADDING BETWEEN BLOCKS */
+    /* 3. ADJUST TOP PADDING */
+    .block-container {
+        padding-top: 3rem !important;
+        padding-bottom: 1rem !important;
+    }
+    
+    /* 4. REMOVE PADDING BETWEEN BLOCKS */
     div.stVerticalBlock > div {
-        gap: 0.5rem !important; /* Tighter vertical spacing */
+        gap: 0.5rem !important;
     }
     
-    /* 3. METRICS (COMPACT) */
+    /* 5. METRICS */
     div[data-testid="stMetricValue"] {
-        font-size: 1.1rem !important; /* Smaller, punchier font */
+        font-size: 1.1rem !important;
         color: #ffa500; 
         font-family: 'Consolas', monospace;
         text-shadow: 0px 0px 4px rgba(255, 165, 0, 0.5);
@@ -36,19 +46,10 @@ st.markdown("""
     div[data-testid="stMetricLabel"] {
         font-size: 0.6rem !important;
         color: #888;
-        margin-bottom: -5px; /* Pull label closer to value */
+        margin-bottom: -5px;
     }
 
-    /* 4. DRONE CARDS (Borders for separation) */
-    .drone-card {
-        border: 1px solid #333;
-        border-radius: 8px;
-        background-color: #111;
-        padding: 10px;
-        margin-bottom: 8px;
-    }
-
-    /* 5. PROGRESS BARS (Slimmer) */
+    /* 6. PROGRESS BARS */
     .stProgress > div > div {
         height: 6px !important;
     }
@@ -56,7 +57,7 @@ st.markdown("""
         background-color: #00d4ff;
     }
 
-    /* 6. BUTTONS (Compact) */
+    /* 7. BUTTONS */
     div.stButton > button {
         background-color: #222;
         color: #00d4ff;
@@ -65,14 +66,14 @@ st.markdown("""
         padding: 0.25rem 0.5rem;
     }
     
-    /* 7. INPUTS */
+    /* 8. INPUTS */
     .stTextInput input {
         background-color: #111;
         color: #fff;
         border: 1px solid #444;
     }
     
-    /* 8. REMOVE HEADER MARGINS */
+    /* 9. HEADERS */
     h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
     hr { margin: 0.5em 0 !important; }
     </style>
@@ -87,7 +88,6 @@ def load_data():
         df.columns = df.columns.str.strip()
         df['model'] = df['model'].replace('Interceptor', 'SKYDIO X-10')
         
-        # Defaults if missing
         defaults = {'recharge_time_min': 60, 'burst_drain_factor': 1.5, 'max_wind_mph': 25}
         for col, val in defaults.items():
             if col not in df.columns: df[col] = val
@@ -108,7 +108,7 @@ def load_data():
         return pd.DataFrame(data)
 
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="drone_sim_compact")
+    geolocator = Nominatim(user_agent="drone_sim_clean")
     try:
         location = geolocator.geocode(f"{zip_code}, USA")
         if location: return [location.latitude, location.longitude]
@@ -138,14 +138,12 @@ def generate_weather():
     st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
 # --- Layout ---
-# Modified split: More map space (7.5), tighter controls (2.5)
 left_col, right_col = st.columns([7.5, 2.5])
 
 # ==========================================
 # RIGHT COLUMN: COMPACT COCKPIT
 # ==========================================
 with right_col:
-    # COMPACT HEADER
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
@@ -162,22 +160,21 @@ with right_col:
                         st.rerun()
 
     elif st.session_state.step >= 2:
-        # 1. STATUS BAR (Very Compact)
-        # Format: Wind | Burst | Reset
+        # STATUS BAR
         bar_c1, bar_c2, bar_c3 = st.columns([1.2, 1.2, 0.8])
         bar_c1.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
         
         with bar_c2:
-            st.write("") # Spacer
+            st.write("") 
             is_burst = st.checkbox("🔥 BURST", value=st.session_state.burst_mode)
             st.session_state.burst_mode = is_burst
             
-        bar_c3.write("") # Spacer
+        bar_c3.write("") 
         if bar_c3.button("RESET"): reset_all()
         
         st.divider()
 
-        # 2. TARGET INFO
+        # TARGET INFO
         if not st.session_state.base:
             st.warning("📍 SET BASE")
         elif not st.session_state.target:
@@ -186,34 +183,29 @@ with right_col:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             st.success(f"Target: {dist:.2f} mi")
 
-        # 3. DRONE FLEET (COMPACT GRID)
+        # DRONE FLEET
         if st.session_state.step == 3:
             df = load_data()
             drone_ui_elements = [] 
             
             for index, row in df.iterrows():
-                # CREATE CARD CONTAINER
                 with st.container():
-                    # Header Line: Name + Status Text
                     head_c1, head_c2 = st.columns([1.5, 1])
                     head_c1.markdown(f"**{row['model']}**")
                     status_placeholder = head_c2.empty()
                     
-                    # Metrics Grid: Speed | Battery | ETA | OnScene
                     m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
                         'specs': row,
                         'status_text': status_placeholder,
-                        'speed_bar': st.empty(), # We place this under metrics
+                        'speed_bar': st.empty(),
                         'metric_speed': m1.empty(),
                         'metric_batt': m2.empty(),
                         'metric_eta': m3.empty(),
                         'metric_hover': m4.empty(),
                     }
                     drone_ui_elements.append(ui_obj)
-                    
-                    # Visual Speed Bar (Thin line below metrics)
                     ui_obj['speed_bar'] = st.progress(0)
                     st.divider()
 
@@ -221,8 +213,6 @@ with right_col:
 # LEFT COLUMN: HIGH CONTRAST MAP
 # ==========================================
 with left_col:
-    # "CartoDB Dark Matter" is high contrast for roads (Grey on Black).
-    # To enhance it, we ensure overlays are bright Neon.
     m = folium.Map(
         location=st.session_state.map_center, 
         zoom_start=st.session_state.map_zoom, 
@@ -236,7 +226,6 @@ with left_col:
             icon=folium.Icon(color='white', icon='home', prefix='fa', icon_color='black')
         ).add_to(m)
         
-        # High Contrast Neon Rings
         rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000')]
         for r, c in rings:
             folium.Circle(
@@ -244,7 +233,6 @@ with left_col:
                 color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8'
             ).add_to(m)
             
-            # Bright Labels
             lat_offset = (r / 69.0)
             folium.map.Marker(
                 [st.session_state.base[0] + lat_offset, st.session_state.base[1]],
@@ -261,7 +249,7 @@ with left_col:
             icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
         ).add_to(m)
         
-        path_color = "#ff3333" if st.session_state.burst_mode else "#00ffff" # Red for burst, Cyan for normal
+        path_color = "#ff3333" if st.session_state.burst_mode else "#00ffff"
         plugins.AntPath(
             locations=[st.session_state.base, st.session_state.target],
             color=path_color, pulse_color="#ffffff",
@@ -270,17 +258,23 @@ with left_col:
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
+    # --- MAP INTERACTION LOGIC ---
     if map_data['last_clicked']:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
+        
+        # LOGIC:
+        # 1. Base not set? Set Base.
+        # 2. Base set? Set/Move Target AND Reset Wind (New Mission Profile).
+        
         if not st.session_state.base:
             st.session_state.base = coords
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
+            generate_weather()  # <--- RESET WIND ON NEW TARGET
             st.session_state.step = 3
             st.rerun()
         
-        # Sync Map State
         if map_data['zoom']: st.session_state.map_zoom = map_data['zoom']
         if map_data['center']: st.session_state.map_center = [map_data['center']['lat'], map_data['center']['lng']]
 
@@ -343,13 +337,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             'drain': drain
         })
 
-    # 2. Ranking Colors
+    # 2. Ranking Colors (Red=Fastest, Yellow=2nd, Green=3rd)
     valid = [d for d in fleet_sim_data if d['possible']]
     valid.sort(key=lambda x: x['t_total'])
+    
     for i, d in enumerate(valid):
-        if i == 0: d['color'] = "#ff0000" # Red (Fastest)
-        elif i == 1: d['color'] = "#ffff00" # Yellow
-        else: d['color'] = "#00ff00" # Green
+        if i == 0: d['color'] = "#ff0000" # RED (1st)
+        elif i == 1: d['color'] = "#ffff00" # YELLOW (2nd)
+        else: d['color'] = "#00ff00" # GREEN (3rd)
 
     # 3. Loop
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
@@ -369,9 +364,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 ui['speed_bar'].progress(0)
                 continue
             
-            # Phase Logic
             phase_txt = ""
-            phase_col = "#00ffff" # Cyan default
+            phase_col = "#00ffff" # Neutral Start
             eta = 0
             site_time = 0
             target_v = 0
@@ -391,21 +385,20 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 target_v = d['tgt_speed']
             else:
                 phase_txt = "DONE"
+                # REVEAL COLOR ON LANDING
                 phase_col = d.get('color', '#00ff00')
                 site_time = d['t_hov']
                 target_v = 0
-                d['curr_v'] = 0 # Force stop
+                d['curr_v'] = 0 
             
             # Smooth Speed
             if d['curr_v'] < target_v: d['curr_v'] += 1
             elif d['curr_v'] > target_v: d['curr_v'] -= 1
             if d['curr_v'] < 0: d['curr_v'] = 0
             
-            # Display Metrics
             ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
             
-            # Speed Bar (0 to Abs Max)
             ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
             
             ui['metric_eta'].metric("ETA", f"{int(eta/60):02d}:{int(eta%60):02d}")
