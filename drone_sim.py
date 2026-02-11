@@ -11,73 +11,70 @@ import random
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
 
-# --- CUSTOM CSS: TACTICAL AMBER THEME ---
+# --- CUSTOM CSS: COMPACT COCKPIT THEME ---
 st.markdown("""
     <style>
-    /* FORCE DARK BACKGROUND */
-    .stApp, .block-container, div[data-testid="stHeader"] {
-        background-color: #0b0c10 !important;
-        color: #c5c6c7;
-    }
-    div.stVerticalBlock, div.stHorizontalBlock, div.element-container {
-        background-color: transparent !important;
-    }
-
-    /* METRICS */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.4rem !important;
-        color: #ffa500; 
-        font-family: 'Consolas', 'Courier New', monospace;
-        font-weight: 700;
-        text-shadow: 0px 0px 5px rgba(255, 165, 0, 0.4);
-    }
-    div[data-testid="stMetricLabel"] {
-        color: #45a29e;
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* BUTTONS */
-    div.stButton > button {
-        background-color: #1f2833;
-        color: #66fcf1;
-        border: 1px solid #45a29e;
-        border-radius: 2px;
-        text-transform: uppercase;
-        font-weight: bold;
-    }
-    div.stButton > button:hover {
-        background-color: #45a29e;
-        color: #0b0c10;
-        border-color: #66fcf1;
-        box-shadow: 0px 0px 10px #45a29e;
-    }
-
-    /* SPEEDOMETER BAR (Cyan) */
-    .stProgress > div > div > div > div {
-        background-color: #66fcf1;
-        transition: width 0.1s linear;
+    /* 1. GLOBAL DARK THEME & TIGHT SPACING */
+    .stApp, .block-container {
+        background-color: #050505 !important;
+        color: #e0e0e0;
+        padding-top: 1rem !important; /* Remove huge top padding */
     }
     
-    /* INPUT FIELDS */
-    .stTextInput > div > div > input {
-        background-color: #1f2833;
-        color: #fff;
-        border: 1px solid #45a29e;
+    /* 2. REMOVE STREAMLIT PADDING BETWEEN BLOCKS */
+    div.stVerticalBlock > div {
+        gap: 0.5rem !important; /* Tighter vertical spacing */
     }
-    .stTextInput input::placeholder {
-        color: #666;
-        font-style: italic;
+    
+    /* 3. METRICS (COMPACT) */
+    div[data-testid="stMetricValue"] {
+        font-size: 1.1rem !important; /* Smaller, punchier font */
+        color: #ffa500; 
+        font-family: 'Consolas', monospace;
+        text-shadow: 0px 0px 4px rgba(255, 165, 0, 0.5);
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.6rem !important;
+        color: #888;
+        margin-bottom: -5px; /* Pull label closer to value */
     }
 
-    /* HEADERS */
-    h1, h2, h3 {
-        color: #66fcf1;
-        font-family: 'Impact', sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 2px;
+    /* 4. DRONE CARDS (Borders for separation) */
+    .drone-card {
+        border: 1px solid #333;
+        border-radius: 8px;
+        background-color: #111;
+        padding: 10px;
+        margin-bottom: 8px;
     }
+
+    /* 5. PROGRESS BARS (Slimmer) */
+    .stProgress > div > div {
+        height: 6px !important;
+    }
+    .stProgress > div > div > div > div {
+        background-color: #00d4ff;
+    }
+
+    /* 6. BUTTONS (Compact) */
+    div.stButton > button {
+        background-color: #222;
+        color: #00d4ff;
+        border: 1px solid #00d4ff;
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* 7. INPUTS */
+    .stTextInput input {
+        background-color: #111;
+        color: #fff;
+        border: 1px solid #444;
+    }
+    
+    /* 8. REMOVE HEADER MARGINS */
+    h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
+    hr { margin: 0.5em 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -88,13 +85,12 @@ def load_data():
         df = df.dropna(subset=['model'])
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
-        
-        # Force Rename
         df['model'] = df['model'].replace('Interceptor', 'SKYDIO X-10')
         
-        if 'recharge_time_min' not in df.columns: df['recharge_time_min'] = 60
-        if 'burst_drain_factor' not in df.columns: df['burst_drain_factor'] = 1.5
-        if 'max_wind_mph' not in df.columns: df['max_wind_mph'] = 25 
+        # Defaults if missing
+        defaults = {'recharge_time_min': 60, 'burst_drain_factor': 1.5, 'max_wind_mph': 25}
+        for col, val in defaults.items():
+            if col not in df.columns: df[col] = val
             
         if df.empty: raise ValueError
         return df
@@ -112,7 +108,7 @@ def load_data():
         return pd.DataFrame(data)
 
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="drone_sim_accel_v2")
+    geolocator = Nominatim(user_agent="drone_sim_compact")
     try:
         location = geolocator.geocode(f"{zip_code}, USA")
         if location: return [location.latitude, location.longitude]
@@ -142,317 +138,292 @@ def generate_weather():
     st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
 # --- Layout ---
-left_col, right_col = st.columns([7, 3])
+# Modified split: More map space (7.5), tighter controls (2.5)
+left_col, right_col = st.columns([7.5, 2.5])
 
 # ==========================================
-# RIGHT COLUMN: OPS DECK
+# RIGHT COLUMN: COMPACT COCKPIT
 # ==========================================
 with right_col:
-    st.markdown("## 📡 OPS DECK")
+    # COMPACT HEADER
+    st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
-        st.info("AWAITING SECTOR COORDINATES")
         with st.form(key='zip_form'):
-            zip_input = st.text_input("ENTER ZIP CODE", value="", placeholder="e.g. 90210")
-            submit_button = st.form_submit_button(label='INITIALIZE SECTOR')
-            if submit_button:
-                if zip_input:
-                    coords = get_lat_lon_from_zip(zip_input)
+            c_in, c_btn = st.columns([2,1])
+            zip_in = c_in.text_input("ZIP", placeholder="90210", label_visibility="collapsed")
+            if c_btn.form_submit_button("INIT"):
+                if zip_in:
+                    coords = get_lat_lon_from_zip(zip_in)
                     if coords:
                         st.session_state.map_center = coords
                         generate_weather()
                         st.session_state.step = 2
                         st.rerun()
-                    else:
-                        st.error("COORDINATES NOT FOUND")
-                else:
-                    st.warning("PLEASE ENTER A ZIP CODE")
 
     elif st.session_state.step >= 2:
-        w_col1, w_col2 = st.columns(2)
-        w_col1.metric("WIND SPEED", f"{st.session_state.wind_speed} MPH")
-        w_col2.metric("DIRECTION", f"{st.session_state.wind_dir}")
-        st.markdown("---")
+        # 1. STATUS BAR (Very Compact)
+        # Format: Wind | Burst | Reset
+        bar_c1, bar_c2, bar_c3 = st.columns([1.2, 1.2, 0.8])
+        bar_c1.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
         
-        c_reset, c_status = st.columns([1,2])
-        c_reset.button("✖ RESET", on_click=reset_all, use_container_width=True)
+        with bar_c2:
+            st.write("") # Spacer
+            is_burst = st.checkbox("🔥 BURST", value=st.session_state.burst_mode)
+            st.session_state.burst_mode = is_burst
+            
+        bar_c3.write("") # Spacer
+        if bar_c3.button("RESET"): reset_all()
         
+        st.divider()
+
+        # 2. TARGET INFO
         if not st.session_state.base:
-            c_status.warning("⚠ SET BASE")
+            st.warning("📍 SET BASE")
         elif not st.session_state.target:
-            c_status.info("⌖ SET TARGET")
+            st.info("🎯 SET TARGET")
         else:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
-            c_status.success(f"LOCKED: {dist:.2f} MI")
-            
-            st.markdown("---")
-            is_burst = st.checkbox("🔥 BURST MODE (MAX SPEED)", value=st.session_state.burst_mode)
-            st.session_state.burst_mode = is_burst
-        
-        st.markdown("---")
-        
+            st.success(f"Target: {dist:.2f} mi")
+
+        # 3. DRONE FLEET (COMPACT GRID)
         if st.session_state.step == 3:
             df = load_data()
             drone_ui_elements = [] 
             
             for index, row in df.iterrows():
+                # CREATE CARD CONTAINER
                 with st.container():
-                    st.markdown(f"### ✈ {row['model']}")
-                    c1, c2, c3, c4, c5 = st.columns(5)
+                    # Header Line: Name + Status Text
+                    head_c1, head_c2 = st.columns([1.5, 1])
+                    head_c1.markdown(f"**{row['model']}**")
+                    status_placeholder = head_c2.empty()
+                    
+                    # Metrics Grid: Speed | Battery | ETA | OnScene
+                    m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
                         'specs': row,
-                        'status_text': st.empty(),
-                        'speed_bar': st.progress(0),
-                        'metric_eta': c1.empty(),
-                        'metric_hover': c2.empty(), 
-                        'metric_speed': c3.empty(),
-                        'metric_batt': c4.empty(),
-                        'metric_recharge': c5.empty()
+                        'status_text': status_placeholder,
+                        'speed_bar': st.empty(), # We place this under metrics
+                        'metric_speed': m1.empty(),
+                        'metric_batt': m2.empty(),
+                        'metric_eta': m3.empty(),
+                        'metric_hover': m4.empty(),
                     }
                     drone_ui_elements.append(ui_obj)
-                    st.markdown("---")
+                    
+                    # Visual Speed Bar (Thin line below metrics)
+                    ui_obj['speed_bar'] = st.progress(0)
+                    st.divider()
 
 # ==========================================
-# LEFT COLUMN: TACTICAL MAP
+# LEFT COLUMN: HIGH CONTRAST MAP
 # ==========================================
 with left_col:
-    # UPDATED: Use 'CartoDB positron' for higher brightness/visibility while keeping clean look
+    # "CartoDB Dark Matter" is high contrast for roads (Grey on Black).
+    # To enhance it, we ensure overlays are bright Neon.
     m = folium.Map(
         location=st.session_state.map_center, 
         zoom_start=st.session_state.map_zoom, 
-        tiles="CartoDB positron" 
+        tiles="CartoDB dark_matter" 
     )
 
     if st.session_state.base:
         folium.Marker(
             st.session_state.base, 
-            tooltip="BASE ALPHA", 
-            icon=folium.Icon(color='lightgray', icon='home', prefix='fa')
+            tooltip="BASE", 
+            icon=folium.Icon(color='white', icon='home', prefix='fa', icon_color='black')
         ).add_to(m)
         
-        # Rings: increased opacity slightly for visibility against light map
-        rings = [(2, '#00aa00'), (3, '#ffa500'), (4, '#ff4500'), (5, '#ff0000')]
+        # High Contrast Neon Rings
+        rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000')]
         for r, c in rings:
             folium.Circle(
                 location=st.session_state.base, radius=r * 1609.34,
-                color=c, weight=2, fill=False, opacity=0.8, dash_array='5, 10'
+                color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8'
             ).add_to(m)
             
+            # Bright Labels
             lat_offset = (r / 69.0)
             folium.map.Marker(
                 [st.session_state.base[0] + lat_offset, st.session_state.base[1]],
                 icon=DivIcon(
-                    icon_size=(150,36), icon_anchor=(75,10),
-                    html=f'<div style="font-size: 9pt; font-weight: bold; color: {c}; background-color: rgba(255,255,255,0.8); padding: 2px 5px; border-radius: 4px; border: 1px solid {c}; text-align: center; width: 50px; margin-left: 50px;">{r} MI</div>'
+                    icon_size=(100,20), icon_anchor=(50,10),
+                    html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>'
                 )
             ).add_to(m)
 
     if st.session_state.target:
         folium.Marker(
             st.session_state.target, 
-            tooltip="TARGET BRAVO", 
+            tooltip="TARGET", 
             icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')
         ).add_to(m)
         
-        path_color = "#ff0000" if st.session_state.burst_mode else "#ffa500"
+        path_color = "#ff3333" if st.session_state.burst_mode else "#00ffff" # Red for burst, Cyan for normal
         plugins.AntPath(
             locations=[st.session_state.base, st.session_state.target],
-            color=path_color, pulse_color="#000000", # Black pulses for visibility on light map
-            weight=5, delay=800, dash_array=[1, 20], line_cap='round'      
+            color=path_color, pulse_color="#ffffff",
+            weight=4, delay=800, dash_array=[10, 20]     
         ).add_to(m)
 
-    map_data = st_folium(m, height=850, use_container_width=True, key="tactical_map")
+    map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
     if map_data['last_clicked']:
-        clicked_coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
-        needs_rerun = False
-        
+        coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         if not st.session_state.base:
-            st.session_state.base = clicked_coords
-            needs_rerun = True
-        else:
-            if st.session_state.target != clicked_coords:
-                st.session_state.target = clicked_coords
-                st.session_state.step = 3
-                needs_rerun = True
+            st.session_state.base = coords
+            st.rerun()
+        elif st.session_state.target != coords:
+            st.session_state.target = coords
+            st.session_state.step = 3
+            st.rerun()
         
+        # Sync Map State
         if map_data['zoom']: st.session_state.map_zoom = map_data['zoom']
         if map_data['center']: st.session_state.map_center = [map_data['center']['lat'], map_data['center']['lng']]
-        
-        if needs_rerun: st.rerun()
 
 # ==========================================
-# SIMULATION ENGINE
+# SIMULATION LOOP
 # ==========================================
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
     fleet_sim_data = []
-    current_wind = st.session_state.wind_speed
     
+    # 1. Physics & Limits
     for drone in drone_ui_elements:
         specs = drone['specs']
         
-        wind_limit = float(specs['max_wind_mph'])
-        is_grounded_by_wind = current_wind > wind_limit
+        wind_fail = st.session_state.wind_speed > float(specs['max_wind_mph'])
         
         if st.session_state.burst_mode:
-            active_max_speed = float(specs['max_speed_mph'])
-            drain_factor = float(specs['burst_drain_factor'])
+            max_v = float(specs['max_speed_mph'])
+            drain = float(specs['burst_drain_factor'])
         else:
-            active_max_speed = float(specs['speed_mph'])
-            drain_factor = 1.0 
+            max_v = float(specs['speed_mph'])
+            drain = 1.0
             
-        speed_mps = active_max_speed / 3600 
-        time_to_scene_sec = dist_one_way / speed_mps
+        speed_mps = max_v / 3600
+        t_out = dist_one_way / speed_mps
         
-        total_battery_sec = float(specs['flight_time_min']) * 60
-        usable_sec = total_battery_sec * 0.80 
+        batt_sec = float(specs['flight_time_min']) * 60
+        usable = batt_sec * 0.80
         
-        round_trip_sec_real = time_to_scene_sec * 2
-        battery_cost_sec = round_trip_sec_real * drain_factor
-        
-        max_hover_sec_real = (usable_sec - battery_cost_sec)
+        cost = (t_out * 2) * drain
+        hover_sec = usable - cost
         
         possible = True
-        fail_reason = ""
+        fail_msg = ""
         
-        if is_grounded_by_wind:
+        if wind_fail:
             possible = False
-            fail_reason = f"WIND LIMIT ({wind_limit} MPH)"
-        elif max_hover_sec_real < 0:
+            fail_msg = "WIND"
+        elif hover_sec < 0:
             possible = False
-            fail_reason = "FUEL CRITICAL"
+            fail_msg = "FUEL"
         elif dist_one_way > float(specs['range_miles']):
             possible = False
-            fail_reason = "OUT OF RANGE"
+            fail_msg = "RANGE"
             
-        mission_total_time = (time_to_scene_sec * 2) + (max_hover_sec_real if possible else 0)
+        total_time = (t_out * 2) + (hover_sec if possible else 0)
         
         fleet_sim_data.append({
             'ui': drone,
-            'time_outbound': time_to_scene_sec,
-            'time_hover': max_hover_sec_real if possible else 0,
-            'time_return': time_to_scene_sec,
-            'total_mission_time': mission_total_time,
-            'total_battery_cap': total_battery_sec,
+            't_out': t_out,
+            't_hov': hover_sec if possible else 0,
+            't_total': total_time,
+            'batt_cap': batt_sec,
             'possible': possible,
-            'fail_reason': fail_reason,
-            'target_speed': active_max_speed,
-            'absolute_max_speed': float(specs['max_speed_mph']),
-            'current_display_speed': 0, 
-            'recharge_min': specs['recharge_time_min'],
-            'drain_factor': drain_factor
+            'fail_msg': fail_msg,
+            'tgt_speed': max_v,
+            'abs_max': float(specs['max_speed_mph']),
+            'curr_v': 0,
+            'drain': drain
         })
 
-    # Ranking
-    valid_missions = [d for d in fleet_sim_data if d['possible']]
-    valid_missions.sort(key=lambda x: x['total_mission_time'])
-    
-    for rank, drone_data in enumerate(valid_missions):
-        if rank == 0: drone_data['rank_color'] = "#ff0000" 
-        elif rank == 1: drone_data['rank_color'] = "#ffff00" 
-        else: drone_data['rank_color'] = "#00ff00" 
+    # 2. Ranking Colors
+    valid = [d for d in fleet_sim_data if d['possible']]
+    valid.sort(key=lambda x: x['t_total'])
+    for i, d in enumerate(valid):
+        if i == 0: d['color'] = "#ff0000" # Red (Fastest)
+        elif i == 1: d['color'] = "#ffff00" # Yellow
+        else: d['color'] = "#00ff00" # Green
 
-    valid_times = [d['total_mission_time'] for d in fleet_sim_data if d['possible']]
-    sim_duration = max(valid_times) if valid_times else 5
+    # 3. Loop
+    sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
     for tick in range(101):
-        current_sim_time = (tick / 100) * sim_duration
+        curr_time = (tick / 100) * sim_dur
         
-        for drone_sim in fleet_sim_data:
-            ui = drone_sim['ui']
+        for d in fleet_sim_data:
+            ui = d['ui']
             
-            if not drone_sim['possible']:
-                ui['status_text'].error(f"⛔ {drone_sim['fail_reason']}")
-                ui['metric_eta'].metric("ETA", "N/A")
-                ui['metric_hover'].metric("ON SCENE", "00:00")
-                ui['metric_batt'].metric("BATTERY", "0%") # Changed Label
-                ui['metric_recharge'].metric("RECHARGE", "--")
-                ui['metric_speed'].metric("VELOCITY", "0 MPH")
+            if not d['possible']:
+                ui['status_text'].markdown(f":red[**{d['fail_msg']}**]")
+                ui['metric_speed'].metric("MPH", "0")
+                ui['metric_batt'].metric("BAT", "0%")
+                ui['metric_eta'].metric("ETA", "--")
+                ui['metric_hover'].metric("SITE", "--")
                 ui['speed_bar'].progress(0)
                 continue
             
-            ui['metric_recharge'].metric("RECHARGE", f"{int(drone_sim['recharge_min'])} min")
-
-            t_out = drone_sim['time_outbound']
-            t_hov = drone_sim['time_hover']
-            t_ret = drone_sim['time_return']
-            t_total = drone_sim['total_mission_time']
+            # Phase Logic
+            phase_txt = ""
+            phase_col = "#00ffff" # Cyan default
+            eta = 0
+            site_time = 0
+            target_v = 0
             
-            phase = ""
-            display_color = "#66fcf1" 
-            eta_val = 0
-            on_scene_val = 0
-            
-            target_v = 0 
-            
-            if current_sim_time < t_out:
-                phase = ">>> INBOUND >>>"
-                eta_val = t_out - current_sim_time
-                target_v = drone_sim['target_speed']
-                
-            elif current_sim_time < (t_out + t_hov):
-                phase = "● ON SCENE"
-                on_scene_val = current_sim_time - t_out
-                target_v = 0 
-                
-            elif current_sim_time < t_total:
-                phase = "<<< RTB <<<"
-                eta_val = t_total - current_sim_time
-                on_scene_val = t_hov
-                target_v = drone_sim['target_speed']
-                
+            if curr_time < d['t_out']:
+                phase_txt = ">> OUT"
+                eta = d['t_out'] - curr_time
+                target_v = d['tgt_speed']
+            elif curr_time < (d['t_out'] + d['t_hov']):
+                phase_txt = "HOVER"
+                site_time = curr_time - d['t_out']
+                target_v = 0
+            elif curr_time < d['t_total']:
+                phase_txt = "<< RTB"
+                eta = d['t_total'] - curr_time
+                site_time = d['t_hov']
+                target_v = d['tgt_speed']
             else:
-                phase = "✓ SECURE"
-                on_scene_val = t_hov
-                display_color = drone_sim.get('rank_color', '#ffa500')
-                target_v = 0 
-                # FORCE ZERO AT END OF MISSION TO FIX "STUCK" BUG
-                drone_sim['current_display_speed'] = 0 
-
-            # Increment/Decrement Speed
-            if drone_sim['current_display_speed'] < target_v:
-                drone_sim['current_display_speed'] += 1
-            elif drone_sim['current_display_speed'] > target_v:
-                drone_sim['current_display_speed'] -= 1
-
-            # Ensure we don't accidentally display -1
-            if drone_sim['current_display_speed'] < 0: drone_sim['current_display_speed'] = 0
-
-            ui['metric_eta'].metric("ETA", f"{int(eta_val/60):02d}:{int(eta_val%60):02d}")
-            ui['metric_hover'].metric("ON SCENE", f"{int(on_scene_val/60):02d}:{int(on_scene_val%60):02d}")
+                phase_txt = "DONE"
+                phase_col = d.get('color', '#00ff00')
+                site_time = d['t_hov']
+                target_v = 0
+                d['curr_v'] = 0 # Force stop
             
-            current_v = drone_sim['current_display_speed']
-            ui['metric_speed'].metric("VELOCITY", f"{int(current_v)} MPH")
-
-            speed_pct = current_v / drone_sim['absolute_max_speed']
-            ui['speed_bar'].progress(min(speed_pct, 1.0))
-
-            # BATTERY CALC
-            time_flying = 0
-            time_hovering = 0
+            # Smooth Speed
+            if d['curr_v'] < target_v: d['curr_v'] += 1
+            elif d['curr_v'] > target_v: d['curr_v'] -= 1
+            if d['curr_v'] < 0: d['curr_v'] = 0
             
-            if current_sim_time < t_out:
-                time_flying = current_sim_time
-            elif current_sim_time < (t_out + t_hov):
-                time_flying = t_out
-                time_hovering = current_sim_time - t_out
-            elif current_sim_time < t_total:
-                time_flying = t_out + (current_sim_time - (t_out + t_hov))
-                time_hovering = t_hov
+            # Display Metrics
+            ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
+            ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
+            
+            # Speed Bar (0 to Abs Max)
+            ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
+            
+            ui['metric_eta'].metric("ETA", f"{int(eta/60):02d}:{int(eta%60):02d}")
+            ui['metric_hover'].metric("SITE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
+            
+            # Battery
+            fly_time = 0
+            hov_time = 0
+            if curr_time < d['t_out']: fly_time = curr_time
+            elif curr_time < (d['t_out'] + d['t_hov']): 
+                fly_time = d['t_out']; hov_time = curr_time - d['t_out']
+            elif curr_time < d['t_total']:
+                fly_time = d['t_out'] + (curr_time - (d['t_out']+d['t_hov'])); hov_time = d['t_hov']
             else:
-                time_flying = t_out + t_ret
-                time_hovering = t_hov
-            
-            batt_used_seconds = (time_flying * drone_sim['drain_factor']) + time_hovering
-            batt_drain_pct = (batt_used_seconds / drone_sim['total_battery_cap']) * 100
-            current_batt = max(0, 100 - batt_drain_pct)
-            
-            status_html = f"<span style='color:{display_color}; font-weight:bold; font-size:1.2em; text-shadow: 0px 0px 5px {display_color};'>{phase}</span>"
-            ui['status_text'].markdown(status_html, unsafe_allow_html=True)
+                fly_time = d['t_out'] * 2; hov_time = d['t_hov']
                 
-            ui['metric_batt'].metric("BATTERY", f"{int(current_batt)}%") # Changed Label
-        
+            used = (fly_time * d['drain']) + hov_time
+            pct = max(0, 100 - (used / d['batt_cap'] * 100))
+            ui['metric_batt'].metric("BAT", f"{int(pct)}%")
+
         time.sleep(0.08)
