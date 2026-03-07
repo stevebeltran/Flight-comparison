@@ -13,54 +13,101 @@ from datetime import datetime, timedelta
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
 
-# --- CUSTOM CSS: CLEAN COCKPIT THEME ---
-st.markdown("""
+# --- Session State Initialization ---
+if 'theme' not in st.session_state: st.session_state.theme = 'Dark'
+if 'step' not in st.session_state: st.session_state.step = 1
+if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
+if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 13
+if 'base' not in st.session_state: st.session_state.base = None
+if 'target' not in st.session_state: st.session_state.target = None
+if 'burst_mode' not in st.session_state: st.session_state.burst_mode = False
+if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
+if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
+if 'inc_type' not in st.session_state: st.session_state.inc_type = None
+if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
+
+# --- DYNAMIC CSS THEMING ---
+if st.session_state.theme == 'Dark':
+    bg_color = "#050505"
+    text_color = "#e0e0e0"
+    metric_val_color = "#ffa500"
+    metric_lbl_color = "#888888"
+    box_bg = "#111111"
+    box_border = "#333333"
+    btn_bg = "#222222"
+    btn_text = "#00d4ff"
+    header_color = "#ffffff"
+    map_tiles = "CartoDB dark_matter"
+    
+    # Simulation Colors - Dark Mode
+    color_fastest = "#00ff00"
+    color_second = "#ffff00"
+    color_third = "#ff0000"
+    color_phase = "#00ffff"
+else:
+    bg_color = "#f4f4f4"
+    text_color = "#111111"
+    metric_val_color = "#d35400"
+    metric_lbl_color = "#555555"
+    box_bg = "#ffffff"
+    box_border = "#cccccc"
+    btn_bg = "#eeeeee"
+    btn_text = "#0055ff"
+    header_color = "#000000"
+    map_tiles = "CartoDB positron"
+    
+    # Simulation Colors - Light Mode (Darker for readability on white)
+    color_fastest = "#00aa00"
+    color_second = "#cc7700"
+    color_third = "#cc0000"
+    color_phase = "#0055ff"
+
+st.markdown(f"""
     <style>
-    header[data-testid="stHeader"] { display: none; }
-    .stApp { background-color: #050505 !important; color: #e0e0e0; }
-    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
-    div.stVerticalBlock > div { gap: 0.5rem !important; }
+    header[data-testid="stHeader"] {{ display: none; }}
+    .stApp {{ background-color: {bg_color} !important; color: {text_color}; }}
+    .block-container {{ padding-top: 3rem !important; padding-bottom: 1rem !important; }}
+    div.stVerticalBlock > div {{ gap: 0.5rem !important; }}
     
-    div[data-testid="stMetricValue"] {
+    div[data-testid="stMetricValue"] {{
         font-size: 1.1rem !important;
-        color: #ffa500; 
+        color: {metric_val_color}; 
         font-family: 'Consolas', monospace;
-        text-shadow: 0px 0px 4px rgba(255, 165, 0, 0.5);
-    }
-    div[data-testid="stMetricLabel"] { font-size: 0.6rem !important; color: #888; margin-bottom: -5px; }
+    }}
+    div[data-testid="stMetricLabel"] {{ font-size: 0.6rem !important; color: {metric_lbl_color}; margin-bottom: -5px; }}
 
-    .stProgress > div > div { height: 6px !important; }
-    .stProgress > div > div > div > div { background-color: #00d4ff; }
+    .stProgress > div > div {{ height: 6px !important; }}
+    .stProgress > div > div > div > div {{ background-color: {color_phase}; }}
 
-    div.stButton > button {
-        background-color: #222;
-        color: #00d4ff;
-        border: 1px solid #00d4ff;
+    div.stButton > button {{
+        background-color: {btn_bg};
+        color: {btn_text};
+        border: 1px solid {btn_text};
         font-size: 0.8rem;
-    }
+    }}
     
-    .stTextInput input { background-color: #111; color: #fff; border: 1px solid #444; }
-    h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
-    hr { margin: 0.5em 0 !important; }
+    .stTextInput input {{ background-color: {box_bg}; color: {text_color}; border: 1px solid {box_border}; }}
+    h3 {{ margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: {header_color};}}
+    hr {{ margin: 0.5em 0 !important; border-color: {box_border} !important; }}
 
     /* --- INCIDENT LOG CSS --- */
-    .incident-log {
-        background-color: #111;
-        border: 1px solid #333;
+    .incident-log {{
+        background-color: {box_bg};
+        border: 1px solid {box_border};
         border-radius: 5px;
         padding: 10px;
         margin-bottom: 15px;
         font-family: 'Consolas', monospace;
         font-size: 0.85rem;
         min-height: 125px; 
-    }
-    .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
-    .log-entry { margin-bottom: 4px; }
-    .log-time { color: #888; margin-right: 12px; }
-    .log-critical { color: #ff3333; font-weight: bold; }
-    .log-action { color: #00d4ff; font-weight: bold; }
-    .log-success { color: #00ff00; font-weight: bold; }
-    .log-info { color: #ffa500; font-weight: bold; }
+    }}
+    .log-header {{ color: {header_color}; font-size: 0.9rem; border-bottom: 1px solid {box_border}; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }}
+    .log-entry {{ margin-bottom: 4px; }}
+    .log-time {{ color: {metric_lbl_color}; margin-right: 12px; }}
+    .log-critical {{ color: {color_third}; font-weight: bold; }}
+    .log-action {{ color: {color_phase}; font-weight: bold; }}
+    .log-success {{ color: {color_fastest}; font-weight: bold; }}
+    .log-info {{ color: {metric_val_color}; font-weight: bold; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -114,30 +161,28 @@ def generate_incident():
     st.session_state.inc_type = inc
     st.session_state.inc_severity = severity
     
-    # Generate a random evening/night shift time
     hr = random.choice(list(range(18, 24)) + list(range(0, 4)))
     mn = random.randint(0, 59)
     sc = random.randint(0, 59)
     
     base_time = datetime.now().replace(hour=hr, minute=mn, second=sc)
     st.session_state.t_call = base_time
-    # Launch is 45-120 seconds after the call drops
     st.session_state.t_launch = base_time + timedelta(seconds=random.randint(45, 120))
     
     if 't_officers' in st.session_state:
         del st.session_state['t_officers']
 
-# --- Session State ---
-if 'step' not in st.session_state: st.session_state.step = 1
-if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
-if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 13
-if 'base' not in st.session_state: st.session_state.base = None
-if 'target' not in st.session_state: st.session_state.target = None
-if 'burst_mode' not in st.session_state: st.session_state.burst_mode = False
-if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
-if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
-if 'inc_type' not in st.session_state: st.session_state.inc_type = None
-if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
+def randomize_squads():
+    """Generates a fresh set of random squad cars around the base."""
+    if st.session_state.base:
+        st.session_state.squad_cars = []
+        num_cars = random.randint(4, 8)
+        for _ in range(num_cars):
+            r_mi = random.uniform(0.5, 9.0) 
+            angle = random.uniform(0, 2 * math.pi)
+            d_lat = (r_mi * math.sin(angle)) / 69.172
+            d_lon = (r_mi * math.cos(angle)) / (69.172 * math.cos(math.radians(st.session_state.base[0])))
+            st.session_state.squad_cars.append([st.session_state.base[0] + d_lat, st.session_state.base[1] + d_lon])
 
 def reset_all():
     st.session_state.step = 1
@@ -151,11 +196,15 @@ def generate_weather():
     st.session_state.wind_speed = random.randint(0, 40)
     st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
+
 # --- Layout ---
 left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
-    st.markdown("### 🚁 OPS CENTER")
+    # Top Action Bar with Theme Switcher
+    top_c1, top_c2 = st.columns([3, 1])
+    top_c1.markdown("### 🚁 OPS CENTER")
+    st.session_state.theme = top_c2.selectbox("Theme", ["Dark", "Light"], label_visibility="collapsed")
     
     if st.session_state.step == 1:
         with st.form(key='zip_form'):
@@ -199,7 +248,6 @@ with right_col:
                     head_c1.markdown(f"**{row['model']}**")
                     status_placeholder = head_c2.empty()
                     
-                    # Columns updated: On Scene | ETA | ADVANTAGE | Battery
                     m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
@@ -215,16 +263,16 @@ with right_col:
                     st.divider()
 
 with left_col:
-    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
+    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles=map_tiles)
 
     if st.session_state.base:
-        folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa', icon_color='black')).add_to(m)
+        folium.Marker(st.session_state.base, icon=folium.Icon(color='white' if st.session_state.theme == 'Dark' else 'black', icon='home', prefix='fa')).add_to(m)
         
         rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000'), (8, '#cc00ff')]
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
-            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
+            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px {"#000" if st.session_state.theme == "Dark" else "#fff"};">{r} MI</div>')).add_to(m)
 
         # Draw Patrol Squad Cars
         for sq in st.session_state.squad_cars:
@@ -232,7 +280,7 @@ with left_col:
 
     if st.session_state.target:
         folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
-        path_color = "#ff3333" if st.session_state.burst_mode else "#00ffff"
+        path_color = "#ff3333" if st.session_state.burst_mode else color_phase
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color=path_color, pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
@@ -241,23 +289,14 @@ with left_col:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         if not st.session_state.base:
             st.session_state.base = coords
-            st.session_state.map_zoom = 11 # Zoom out to see the 8 mile ring
-            
-            # Generate random squad cars around the base
-            st.session_state.squad_cars = []
-            num_cars = random.randint(4, 8)
-            for _ in range(num_cars):
-                r_mi = random.uniform(0.5, 9.0) # Within 9 miles
-                angle = random.uniform(0, 2 * math.pi)
-                d_lat = (r_mi * math.sin(angle)) / 69.172
-                d_lon = (r_mi * math.cos(angle)) / (69.172 * math.cos(math.radians(coords[0])))
-                st.session_state.squad_cars.append([coords[0] + d_lat, coords[1] + d_lon])
-                
+            st.session_state.map_zoom = 11 
+            randomize_squads() # Initial squad car spawn
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
             generate_weather()
             generate_incident() 
+            randomize_squads() # Re-randomize squad cars on new target click
             st.session_state.step = 3
             st.rerun()
 
@@ -274,15 +313,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         if d < best_officer_dist:
             best_officer_dist = d
             
-    # Fallback to base distance if something went wrong with squad car generation
     if best_officer_dist == float('inf'): 
         best_officer_dist = dist_one_way
 
     officer_speed_mph = 35.0
-    officer_route_dist = best_officer_dist * 1.4 # Ground routes are typically 40% longer than straight-line
+    officer_route_dist = best_officer_dist * 1.4 
     officer_travel_sec = officer_route_dist / (officer_speed_mph / 3600.0)
     
-    # Officers assume dispatch 60 seconds after call drops
     if 't_officers' not in st.session_state:
         st.session_state.t_officers = st.session_state.t_call + timedelta(seconds=60) + timedelta(seconds=officer_travel_sec)
 
@@ -311,7 +348,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     valid = [d for d in fleet_sim_data if d['possible']]
     valid.sort(key=lambda x: x['t_total'], reverse=True) 
     
-    # Pre-calculate advantages and arrival times
     fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
     
@@ -324,16 +360,15 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             d['adv_min'] = 0.0
 
     for i, d in enumerate(valid):
-        if i == 0: d['perf_color'] = "#00ff00" 
-        elif i == 1: d['perf_color'] = "#ffff00" 
-        else: d['perf_color'] = "#ff0000" 
+        if i == 0: d['perf_color'] = color_fastest 
+        elif i == 1: d['perf_color'] = color_second 
+        else: d['perf_color'] = color_third 
 
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
     for tick in range(101):
         curr_time = (tick / 100) * sim_dur
 
-        # Dynamic Chronological Timeline Logic
         log_events = [
             (st.session_state.t_call, f'<span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span>'),
             (st.session_state.t_launch, '<span class="log-action">DRONE LAUNCHED</span>')
@@ -346,10 +381,9 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         if curr_time >= officer_sec_since_launch:
             log_events.append((st.session_state.t_officers, '<span class="log-info">OFFICERS ARRIVE</span>'))
 
-        # Sort the HTML entries by their datetime to ensure correct chronological display
         log_events.sort(key=lambda x: x[0])
 
-        log_html = """
+        log_html = f"""
         <div class="incident-log">
             <div class="log-header">📋 INCIDENT LOG</div>
         """
@@ -367,9 +401,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 ui['metric_adv'].metric("ADVANTAGE", "N/A")
                 continue
             
-            phase_txt, phase_col, site_time = "", "#00ffff", 0
+            phase_txt, phase_col, site_time = "", color_phase, 0
             
-            # Flight Progress Bar Logic
             if curr_time < d['t_out']:
                 phase_txt = ">> OUTBOUND"
                 flight_prog = curr_time / d['t_out']
@@ -380,16 +413,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 phase_txt, site_time = "<< RTB", d['t_hov']
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
             else:
-                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov']
+                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', color_fastest), d['t_hov']
                 flight_prog = 0.0
 
-            ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
+            ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # Locked-in Operational Metrics
             ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
             
-            # Format advantage string properly depending on who got there first
             if d['adv_min'] > 0:
                 adv_str = f"+{d['adv_min']:.1f} MIN"
             else:
@@ -398,7 +429,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
-            # Battery Logic
             used = (min(curr_time, d['t_out']) * d['drain']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + (max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out'])) * d['drain'])
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
