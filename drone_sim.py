@@ -7,6 +7,7 @@ from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
 import random
+import math
 from datetime import datetime, timedelta
 
 # --- Page Configuration ---
@@ -136,11 +137,13 @@ if 'burst_mode' not in st.session_state: st.session_state.burst_mode = False
 if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
 if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
+if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 
 def reset_all():
     st.session_state.step = 1
     st.session_state.base = None
     st.session_state.target = None
+    st.session_state.squad_cars = []
     if 't_officers' in st.session_state:
         del st.session_state['t_officers']
 
@@ -223,6 +226,10 @@ with left_col:
             lat_offset = (r / 69.0)
             folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
+        # Draw Patrol Squad Cars
+        for sq in st.session_state.squad_cars:
+            folium.Marker(sq, icon=folium.Icon(color='blue', icon='car', prefix='fa')).add_to(m)
+
     if st.session_state.target:
         folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
         path_color = "#ff3333" if st.session_state.burst_mode else "#00ffff"
@@ -234,6 +241,18 @@ with left_col:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         if not st.session_state.base:
             st.session_state.base = coords
+            st.session_state.map_zoom = 11 # Zoom out to see the 8 mile ring
+            
+            # Generate random squad cars around the base
+            st.session_state.squad_cars = []
+            num_cars = random.randint(4, 8)
+            for _ in range(num_cars):
+                r_mi = random.uniform(0.5, 9.0) # Within 9 miles
+                angle = random.uniform(0, 2 * math.pi)
+                d_lat = (r_mi * math.sin(angle)) / 69.172
+                d_lon = (r_mi * math.cos(angle)) / (69.172 * math.cos(math.radians(coords[0])))
+                st.session_state.squad_cars.append([coords[0] + d_lat, coords[1] + d_lon])
+                
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
@@ -248,9 +267,19 @@ with left_col:
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
     
-    # --- Officer Ground Routing Math ---
+    # --- Officer Ground Routing Math (Closest Squad Car) ---
+    best_officer_dist = float('inf')
+    for sq in st.session_state.squad_cars:
+        d = get_distance_miles(sq, st.session_state.target)
+        if d < best_officer_dist:
+            best_officer_dist = d
+            
+    # Fallback to base distance if something went wrong with squad car generation
+    if best_officer_dist == float('inf'): 
+        best_officer_dist = dist_one_way
+
     officer_speed_mph = 35.0
-    officer_route_dist = dist_one_way * 1.4 # Ground routes are typically 40% longer than straight-line
+    officer_route_dist = best_officer_dist * 1.4 # Ground routes are typically 40% longer than straight-line
     officer_travel_sec = officer_route_dist / (officer_speed_mph / 3600.0)
     
     # Officers assume dispatch 60 seconds after call drops
@@ -304,20 +333,29 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     for tick in range(101):
         curr_time = (tick / 100) * sim_dur
 
-        # Dynamic Timeline Logic (Calculates true real-world arrival times)
-        log_html = f"""
-        <div class="incident-log">
-            <div class="log-header">📋 INCIDENT LOG</div>
-            <div class="log-entry"><span class="log-time">{st.session_state.t_call.strftime('%H:%M:%S')}</span><span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span></div>
-            <div class="log-entry"><span class="log-time">{st.session_state.t_launch.strftime('%H:%M:%S')}</span><span class="log-action">DRONE LAUNCHED</span></div>
-        """
+        # Dynamic Chronological Timeline Logic
+        log_events = [
+            (st.session_state.t_call, f'<span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span>'),
+            (st.session_state.t_launch, '<span class="log-action">DRONE LAUNCHED</span>')
+        ]
+        
         if curr_time >= fastest_t_out and valid:
-            log_html += f'<div class="log-entry"><span class="log-time">{t_drone_arrival.strftime("%H:%M:%S")}</span><span class="log-success">DRONE ON SCENE</span></div>'
+            log_events.append((t_drone_arrival, '<span class="log-success">DRONE ON SCENE</span>'))
 
         officer_sec_since_launch = (st.session_state.t_officers - st.session_state.t_launch).total_seconds()
         if curr_time >= officer_sec_since_launch:
-            log_html += f'<div class="log-entry"><span class="log-time">{st.session_state.t_officers.strftime("%H:%M:%S")}</span><span class="log-info">OFFICERS ARRIVE</span></div>'
+            log_events.append((st.session_state.t_officers, '<span class="log-info">OFFICERS ARRIVE</span>'))
 
+        # Sort the HTML entries by their datetime to ensure correct chronological display
+        log_events.sort(key=lambda x: x[0])
+
+        log_html = """
+        <div class="incident-log">
+            <div class="log-header">📋 INCIDENT LOG</div>
+        """
+        for dt, html_str in log_events:
+            log_html += f'<div class="log-entry"><span class="log-time">{dt.strftime("%H:%M:%S")}</span>{html_str}</div>'
+        
         log_html += "</div>"
         incident_placeholder.markdown(log_html, unsafe_allow_html=True)
 
@@ -331,7 +369,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             
             phase_txt, phase_col, site_time = "", "#00ffff", 0
             
-            # Flight Progress Bar Logic (Replaces the speed bar)
+            # Flight Progress Bar Logic
             if curr_time < d['t_out']:
                 phase_txt = ">> OUTBOUND"
                 flight_prog = curr_time / d['t_out']
@@ -351,9 +389,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             # Locked-in Operational Metrics
             ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
             
-            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
+            # Format advantage string properly depending on who got there first
+            if d['adv_min'] > 0:
+                adv_str = f"+{d['adv_min']:.1f} MIN"
+            else:
+                adv_str = f"{d['adv_min']:.1f} MIN"
+                
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
-            
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
             # Battery Logic
@@ -362,4 +404,3 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
         time.sleep(0.16)
-    
