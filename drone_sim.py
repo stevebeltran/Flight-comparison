@@ -84,19 +84,19 @@ def load_data():
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
         
-        defaults = {'recharge_time_min': 60, 'max_wind_mph': 25}
+        # Cleaned up defaults to only include what we actively use
+        defaults = {'max_wind_mph': 25}
         for col, val in defaults.items():
             if col not in df.columns: df[col] = val
         return df
     except:
+        # Streamlined fallback data to match the clean CSV structure
         data = {
-            'model': ['Scout', 'Heavy-Lift', 'SKYDIO X-10'],
-            'flight_time_min': [25, 40, 15],
-            'speed_mph': [35, 25, 60], 
-            'max_speed_mph': [40, 30, 70],
-            'range_miles': [6, 9, 5],
-            'recharge_time_min': [45, 60, 30],
-            'max_wind_mph': [25, 30, 40]
+            'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
+            'flight_time_min': [42, 60, 21, 33],
+            'speed_mph': [30, 50, 45, 47],
+            'range_miles': [5, 12, 5, 6],
+            'max_wind_mph': [28, 42, 25, 25]
         }
         return pd.DataFrame(data)
 
@@ -232,7 +232,6 @@ with left_col:
             lat_offset = (r / 69.0)
             folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
-        # Draw Patrol Squad Cars with CSS Fade-In Animation
         for sq in st.session_state.squad_cars:
             car_html = """
             <style>
@@ -269,7 +268,6 @@ with left_col:
             st.session_state.target = coords
             generate_weather()
             generate_incident() 
-            # REMOVED: randomize_squads() - Cars now stay where they spawned after the last run!
             st.session_state.step = 3
             st.session_state.sim_completed = False
             st.rerun()
@@ -313,9 +311,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             'ui': drone, 't_out': t_out, 't_hov': hover_sec if possible else 0,
             't_total': (t_out * 2) + (hover_sec if possible else 0),
             'batt_cap': batt_sec, 'possible': possible,
-            'fail_msg': "WIND" if wind_fail else "FUEL" if hover_sec < 0 else "RANGE",
-            'tgt_speed': max_v, 'abs_max': float(specs['max_speed_mph']),
-            'curr_v': 0
+            'fail_msg': "WIND" if wind_fail else "FUEL" if hover_sec < 0 else "RANGE"
         })
 
     valid = [d for d in fleet_sim_data if d['possible']]
@@ -404,21 +400,16 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
-    # If the simulation hasn't completed yet, run the timer ticks
     if not st.session_state.sim_completed:
         for tick in range(101):
             curr_time = (tick / 100) * sim_dur
             render_ui_state(curr_time)
             time.sleep(0.16)
 
-        # Hold for 3 seconds so user can see "✓ AT STATION" state
         time.sleep(3.0) 
-        
-        # Scramble squad cars behind the scenes, flag as complete, and rerun
         randomize_squads()
         st.session_state.sim_completed = True
         st.rerun()
         
-    # If the simulation has already run, display the final frozen state
     else:
         render_ui_state(sim_dur)
