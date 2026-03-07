@@ -14,100 +14,64 @@ from datetime import datetime, timedelta
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
 
 # --- Session State Initialization ---
-if 'theme' not in st.session_state: st.session_state.theme = 'Dark'
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
 if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 13
 if 'base' not in st.session_state: st.session_state.base = None
 if 'target' not in st.session_state: st.session_state.target = None
-if 'burst_mode' not in st.session_state: st.session_state.burst_mode = False
 if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
 if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 
-# --- DYNAMIC CSS THEMING ---
-if st.session_state.theme == 'Dark':
-    bg_color = "#050505"
-    text_color = "#e0e0e0"
-    metric_val_color = "#ffa500"
-    metric_lbl_color = "#888888"
-    box_bg = "#111111"
-    box_border = "#333333"
-    btn_bg = "#222222"
-    btn_text = "#00d4ff"
-    header_color = "#ffffff"
-    map_tiles = "CartoDB dark_matter"
-    
-    # Simulation Colors - Dark Mode
-    color_fastest = "#00ff00"
-    color_second = "#ffff00"
-    color_third = "#ff0000"
-    color_phase = "#00ffff"
-else:
-    bg_color = "#f4f4f4"
-    text_color = "#111111"
-    metric_val_color = "#d35400"
-    metric_lbl_color = "#555555"
-    box_bg = "#ffffff"
-    box_border = "#cccccc"
-    btn_bg = "#eeeeee"
-    btn_text = "#0055ff"
-    header_color = "#000000"
-    map_tiles = "CartoDB positron"
-    
-    # Simulation Colors - Light Mode (Darker for readability on white)
-    color_fastest = "#00aa00"
-    color_second = "#cc7700"
-    color_third = "#cc0000"
-    color_phase = "#0055ff"
-
-st.markdown(f"""
+# --- CUSTOM CSS: CLEAN COCKPIT THEME ---
+st.markdown("""
     <style>
-    header[data-testid="stHeader"] {{ display: none; }}
-    .stApp {{ background-color: {bg_color} !important; color: {text_color}; }}
-    .block-container {{ padding-top: 3rem !important; padding-bottom: 1rem !important; }}
-    div.stVerticalBlock > div {{ gap: 0.5rem !important; }}
+    header[data-testid="stHeader"] { display: none; }
+    .stApp { background-color: #050505 !important; color: #e0e0e0; }
+    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
+    div.stVerticalBlock > div { gap: 0.5rem !important; }
     
-    div[data-testid="stMetricValue"] {{
+    div[data-testid="stMetricValue"] {
         font-size: 1.1rem !important;
-        color: {metric_val_color}; 
+        color: #ffa500; 
         font-family: 'Consolas', monospace;
-    }}
-    div[data-testid="stMetricLabel"] {{ font-size: 0.6rem !important; color: {metric_lbl_color}; margin-bottom: -5px; }}
+        text-shadow: 0px 0px 4px rgba(255, 165, 0, 0.5);
+    }
+    div[data-testid="stMetricLabel"] { font-size: 0.6rem !important; color: #888; margin-bottom: -5px; }
 
-    .stProgress > div > div {{ height: 6px !important; }}
-    .stProgress > div > div > div > div {{ background-color: {color_phase}; }}
+    .stProgress > div > div { height: 6px !important; }
+    .stProgress > div > div > div > div { background-color: #00d4ff; }
 
-    div.stButton > button {{
-        background-color: {btn_bg};
-        color: {btn_text};
-        border: 1px solid {btn_text};
+    div.stButton > button {
+        background-color: #222;
+        color: #00d4ff;
+        border: 1px solid #00d4ff;
         font-size: 0.8rem;
-    }}
+    }
     
-    .stTextInput input {{ background-color: {box_bg}; color: {text_color}; border: 1px solid {box_border}; }}
-    h3 {{ margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: {header_color};}}
-    hr {{ margin: 0.5em 0 !important; border-color: {box_border} !important; }}
+    .stTextInput input { background-color: #111; color: #fff; border: 1px solid #444; }
+    h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
+    hr { margin: 0.5em 0 !important; border-color: #333 !important; }
 
     /* --- INCIDENT LOG CSS --- */
-    .incident-log {{
-        background-color: {box_bg};
-        border: 1px solid {box_border};
+    .incident-log {
+        background-color: #111;
+        border: 1px solid #333;
         border-radius: 5px;
         padding: 10px;
         margin-bottom: 15px;
         font-family: 'Consolas', monospace;
         font-size: 0.85rem;
         min-height: 125px; 
-    }}
-    .log-header {{ color: {header_color}; font-size: 0.9rem; border-bottom: 1px solid {box_border}; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }}
-    .log-entry {{ margin-bottom: 4px; }}
-    .log-time {{ color: {metric_lbl_color}; margin-right: 12px; }}
-    .log-critical {{ color: {color_third}; font-weight: bold; }}
-    .log-action {{ color: {color_phase}; font-weight: bold; }}
-    .log-success {{ color: {color_fastest}; font-weight: bold; }}
-    .log-info {{ color: {metric_val_color}; font-weight: bold; }}
+    }
+    .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
+    .log-entry { margin-bottom: 4px; }
+    .log-time { color: #888; margin-right: 12px; }
+    .log-critical { color: #ff0000; font-weight: bold; }
+    .log-action { color: #00ffff; font-weight: bold; }
+    .log-success { color: #00ff00; font-weight: bold; }
+    .log-info { color: #ffa500; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -119,19 +83,19 @@ def load_data():
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
         
-        defaults = {'recharge_time_min': 60, 'burst_drain_factor': 1.5, 'max_wind_mph': 25}
+        defaults = {'recharge_time_min': 60, 'max_wind_mph': 25}
         for col, val in defaults.items():
             if col not in df.columns: df[col] = val
         return df
     except:
+        # Standardized speeds for rapid response since burst is removed
         data = {
             'model': ['Scout', 'Heavy-Lift', 'SKYDIO X-10'],
             'flight_time_min': [25, 40, 15],
-            'speed_mph': [22, 18, 55],
-            'max_speed_mph': [35, 25, 80],
+            'speed_mph': [35, 25, 60], 
+            'max_speed_mph': [40, 30, 70],
             'range_miles': [6, 9, 5],
             'recharge_time_min': [45, 60, 30],
-            'burst_drain_factor': [1.2, 1.3, 1.5],
             'max_wind_mph': [25, 30, 40]
         }
         return pd.DataFrame(data)
@@ -173,10 +137,10 @@ def generate_incident():
         del st.session_state['t_officers']
 
 def randomize_squads():
-    """Generates a fresh set of random squad cars around the base."""
+    """Generates 3 to 5 random squad cars around the base."""
     if st.session_state.base:
         st.session_state.squad_cars = []
-        num_cars = random.randint(4, 8)
+        num_cars = random.randint(3, 5) # Limited per instructions
         for _ in range(num_cars):
             r_mi = random.uniform(0.5, 9.0) 
             angle = random.uniform(0, 2 * math.pi)
@@ -196,15 +160,11 @@ def generate_weather():
     st.session_state.wind_speed = random.randint(0, 40)
     st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
-
 # --- Layout ---
 left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
-    # Top Action Bar with Theme Switcher
-    top_c1, top_c2 = st.columns([3, 1])
-    top_c1.markdown("### 🚁 OPS CENTER")
-    st.session_state.theme = top_c2.selectbox("Theme", ["Dark", "Light"], label_visibility="collapsed")
+    st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
         with st.form(key='zip_form'):
@@ -220,12 +180,9 @@ with right_col:
                         st.rerun()
 
     elif st.session_state.step >= 2:
-        bar_c1, bar_c2, bar_c3 = st.columns([1.2, 1.2, 0.8])
+        bar_c1, bar_c2 = st.columns([2.0, 1.0])
         bar_c1.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
-        with bar_c2:
-            st.write("") 
-            st.session_state.burst_mode = st.checkbox("🔥 BURST", value=st.session_state.burst_mode)
-        if bar_c3.button("RESET"): reset_all()
+        if bar_c2.button("RESET"): reset_all()
         
         st.divider()
 
@@ -263,25 +220,39 @@ with right_col:
                     st.divider()
 
 with left_col:
-    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles=map_tiles)
+    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
 
     if st.session_state.base:
-        folium.Marker(st.session_state.base, icon=folium.Icon(color='white' if st.session_state.theme == 'Dark' else 'black', icon='home', prefix='fa')).add_to(m)
+        folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa')).add_to(m)
         
         rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000'), (8, '#cc00ff')]
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
-            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px {"#000" if st.session_state.theme == "Dark" else "#fff"};">{r} MI</div>')).add_to(m)
+            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
-        # Draw Patrol Squad Cars
+        # Draw Patrol Squad Cars with CSS Fade-In Animation
         for sq in st.session_state.squad_cars:
-            folium.Marker(sq, icon=folium.Icon(color='blue', icon='car', prefix='fa')).add_to(m)
+            car_html = """
+            <style>
+            @keyframes carFadeIn {
+                0% { opacity: 0; transform: scale(0.3); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+            .fade-car {
+                animation: carFadeIn 2.5s ease-in-out;
+                color: #00d4ff;
+                font-size: 18px;
+                text-shadow: 0 0 5px #000;
+            }
+            </style>
+            <div class="fade-car"><i class="fa fa-car"></i></div>
+            """
+            folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
         folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
-        path_color = "#ff3333" if st.session_state.burst_mode else color_phase
-        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color=path_color, pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
+        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00ffff", pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -290,13 +261,12 @@ with left_col:
         if not st.session_state.base:
             st.session_state.base = coords
             st.session_state.map_zoom = 11 
-            randomize_squads() # Initial squad car spawn
+            randomize_squads() 
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
             generate_weather()
             generate_incident() 
-            randomize_squads() # Re-randomize squad cars on new target click
             st.session_state.step = 3
             st.rerun()
 
@@ -328,12 +298,11 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     for drone in drone_ui_elements:
         specs = drone['specs']
         wind_fail = st.session_state.wind_speed > float(specs['max_wind_mph'])
-        max_v = float(specs['max_speed_mph']) if st.session_state.burst_mode else float(specs['speed_mph'])
-        drain = float(specs['burst_drain_factor']) if st.session_state.burst_mode else 1.0
+        max_v = float(specs['speed_mph'])
         
         t_out = dist_one_way / (max_v / 3600)
         batt_sec = float(specs['flight_time_min']) * 60
-        hover_sec = (batt_sec * 0.80) - ((t_out * 2) * drain)
+        hover_sec = (batt_sec * 0.80) - (t_out * 2)
         
         possible = not wind_fail and hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
@@ -342,7 +311,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             't_total': (t_out * 2) + (hover_sec if possible else 0),
             'batt_cap': batt_sec, 'possible': possible,
             'fail_msg': "WIND" if wind_fail else "FUEL" if hover_sec < 0 else "RANGE",
-            'drain': drain
+            'tgt_speed': max_v, 'abs_max': float(specs['max_speed_mph']),
+            'curr_v': 0
         })
 
     valid = [d for d in fleet_sim_data if d['possible']]
@@ -360,9 +330,9 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             d['adv_min'] = 0.0
 
     for i, d in enumerate(valid):
-        if i == 0: d['perf_color'] = color_fastest 
-        elif i == 1: d['perf_color'] = color_second 
-        else: d['perf_color'] = color_third 
+        if i == 0: d['perf_color'] = "#00ff00" 
+        elif i == 1: d['perf_color'] = "#ffff00" 
+        else: d['perf_color'] = "#ff0000" 
 
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
@@ -401,7 +371,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 ui['metric_adv'].metric("ADVANTAGE", "N/A")
                 continue
             
-            phase_txt, phase_col, site_time = "", color_phase, 0
+            phase_txt, phase_col, site_time = "", "#00ffff", 0
             
             if curr_time < d['t_out']:
                 phase_txt = ">> OUTBOUND"
@@ -413,7 +383,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 phase_txt, site_time = "<< RTB", d['t_hov']
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
             else:
-                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', color_fastest), d['t_hov']
+                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov']
                 flight_prog = 0.0
 
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold;'>{phase_txt}</span>", unsafe_allow_html=True)
@@ -429,8 +399,20 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
-            used = (min(curr_time, d['t_out']) * d['drain']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + (max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out'])) * d['drain'])
+            used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
         time.sleep(0.16)
+
+    # --- AFTER SIMULATION ENDS ---
+    # Hold for 3 seconds so user can see "✓ SECURE" state
+    time.sleep(3.0) 
+    
+    # Trigger the map reset and car randomization
+    randomize_squads()
+    st.session_state.target = None
+    st.session_state.step = 2
+    if 't_officers' in st.session_state:
+        del st.session_state['t_officers']
+    st.rerun()
