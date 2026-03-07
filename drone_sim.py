@@ -40,6 +40,24 @@ st.markdown("""
     .stTextInput input { background-color: #111; color: #fff; border: 1px solid #444; }
     h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
     hr { margin: 0.5em 0 !important; }
+
+    /* --- INCIDENT LOG CSS --- */
+    .incident-log {
+        background-color: #111;
+        border: 1px solid #333;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 15px;
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+    }
+    .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
+    .log-entry { margin-bottom: 4px; }
+    .log-time { color: #888; margin-right: 12px; }
+    .log-critical { color: #ff3333; font-weight: bold; }
+    .log-action { color: #00d4ff; font-weight: bold; }
+    .log-success { color: #00ff00; font-weight: bold; }
+    .log-info { color: #ffa500; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -134,6 +152,17 @@ with right_col:
         else:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             st.success(f"Target: {dist:.2f} mi")
+
+            # --- INCIDENT LOG UI ---
+            st.markdown("""
+            <div class="incident-log">
+                <div class="log-header">📋 INCIDENT LOG</div>
+                <div class="log-entry"><span class="log-time">21:34</span><span class="log-critical">SHOTS FIRED</span></div>
+                <div class="log-entry"><span class="log-time">21:35</span><span class="log-action">DRONE LAUNCHED</span></div>
+                <div class="log-entry"><span class="log-time">21:36</span><span class="log-success">DRONE ON SCENE</span></div>
+                <div class="log-entry"><span class="log-time">21:40</span><span class="log-info">OFFICERS ARRIVE</span></div>
+            </div>
+            """, unsafe_allow_html=True)
 
         if st.session_state.step == 3:
             df = load_data()
