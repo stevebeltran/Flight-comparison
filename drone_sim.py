@@ -9,6 +9,7 @@ import time
 import random
 import math
 from datetime import datetime, timedelta
+from st_keyup import st_keyup
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
@@ -51,7 +52,7 @@ st.markdown("""
         font-size: 0.8rem;
     }
     
-    .stTextInput input { background-color: #111; color: #fff; border: 1px solid #444; }
+    .stTextInput input, div[data-testid="stKeyup"] input { background-color: #111; color: #fff; border: 1px solid #444; }
     h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
     hr { margin: 0.5em 0 !important; border-color: #333 !important; }
 
@@ -84,19 +85,17 @@ def load_data():
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
         
-        # Cleaned up defaults to only include what we actively use
         defaults = {'max_wind_mph': 25}
         for col, val in defaults.items():
             if col not in df.columns: df[col] = val
         return df
     except:
-        # Streamlined fallback data to match the clean CSV structure
         data = {
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
-            'flight_time_min': [42, 60, 21, 33],
-            'speed_mph': [30, 50, 45, 47],
-            'range_miles': [5, 12, 5, 6],
-            'max_wind_mph': [28, 42, 25, 25]
+            'flight_time_min': [42, 60, 40, 54],
+            'speed_mph': [45, 50, 45, 47],
+            'range_miles': [5, 12, 7.5, 6.2],
+            'max_wind_mph': [28, 42, 28, 26]
         }
         return pd.DataFrame(data)
 
@@ -168,17 +167,18 @@ with right_col:
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
-        with st.form(key='zip_form'):
-            c_in, c_btn = st.columns([2,1])
-            zip_in = c_in.text_input("ZIP", placeholder="61047", label_visibility="collapsed")
-            if c_btn.form_submit_button("INIT"):
-                if zip_in:
-                    coords = get_lat_lon_from_zip(zip_in)
-                    if coords:
-                        st.session_state.map_center = coords
-                        generate_weather()
-                        st.session_state.step = 2
-                        st.rerun()
+        # Instant-trigger ZIP code input
+        zip_in = st_keyup("ZIP", placeholder="Enter 5-digit ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
+        
+        if zip_in and len(zip_in) == 5:
+            coords = get_lat_lon_from_zip(zip_in)
+            if coords:
+                st.session_state.map_center = coords
+                generate_weather()
+                st.session_state.step = 2
+                st.rerun()
+            else:
+                st.error("Invalid ZIP code. Please try again.")
 
     elif st.session_state.step >= 2:
         bar_c1, bar_c2 = st.columns([2.0, 1.0])
