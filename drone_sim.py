@@ -50,6 +50,7 @@ st.markdown("""
         margin-bottom: 15px;
         font-family: 'Consolas', monospace;
         font-size: 0.85rem;
+        min-height: 125px; /* Keeps UI from jumping when text appears */
     }
     .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
     .log-entry { margin-bottom: 4px; }
@@ -153,16 +154,8 @@ with right_col:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             st.success(f"Target: {dist:.2f} mi")
 
-            # --- INCIDENT LOG UI ---
-            st.markdown("""
-            <div class="incident-log">
-                <div class="log-header">📋 INCIDENT LOG</div>
-                <div class="log-entry"><span class="log-time">21:34</span><span class="log-critical">SHOTS FIRED</span></div>
-                <div class="log-entry"><span class="log-time">21:35</span><span class="log-action">DRONE LAUNCHED</span></div>
-                <div class="log-entry"><span class="log-time">21:36</span><span class="log-success">DRONE ON SCENE</span></div>
-                <div class="log-entry"><span class="log-time">21:40</span><span class="log-info">OFFICERS ARRIVE</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Create an empty placeholder for the dynamic incident log
+            incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
             df = load_data()
@@ -193,7 +186,10 @@ with left_col:
 
     if st.session_state.base:
         folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa', icon_color='black')).add_to(m)
-        rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000')]
+        
+        # Added the 8 mile ring with a distinct purple hex color (#cc00ff)
+        rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000'), (8, '#cc00ff')]
+        
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
@@ -256,6 +252,19 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     
     for tick in range(101):
         curr_time = (tick / 100) * sim_dur
+
+        # Dynamic Timeline Logic
+        log_html = f"""
+        <div class="incident-log">
+            <div class="log-header">📋 INCIDENT LOG</div>
+            { '<div class="log-entry"><span class="log-time">21:34</span><span class="log-critical">SHOTS FIRED</span></div>' if tick >= 0 else '' }
+            { '<div class="log-entry"><span class="log-time">21:35</span><span class="log-action">DRONE LAUNCHED</span></div>' if tick >= 15 else '' }
+            { '<div class="log-entry"><span class="log-time">21:36</span><span class="log-success">DRONE ON SCENE</span></div>' if tick >= 40 else '' }
+            { '<div class="log-entry"><span class="log-time">21:40</span><span class="log-info">OFFICERS ARRIVE</span></div>' if tick >= 80 else '' }
+        </div>
+        """
+        incident_placeholder.markdown(log_html, unsafe_allow_html=True)
+
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
