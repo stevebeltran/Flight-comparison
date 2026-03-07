@@ -226,7 +226,6 @@ with left_col:
     if st.session_state.base:
         folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa')).add_to(m)
         
-        # Ring values updated as requested
         rings = [(2, '#00ff00'), (4, '#ffff00'), (6, '#ff9900'), (8, '#cc00ff')]
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
@@ -262,7 +261,6 @@ with left_col:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         if not st.session_state.base:
             st.session_state.base = coords
-            # Zoom level optimized to view 8-mile range perfectly
             st.session_state.map_zoom = 12 
             randomize_squads() 
             st.session_state.sim_completed = False
@@ -271,7 +269,7 @@ with left_col:
             st.session_state.target = coords
             generate_weather()
             generate_incident() 
-            randomize_squads() 
+            # REMOVED: randomize_squads() - Cars now stay where they spawned after the last run!
             st.session_state.step = 3
             st.session_state.sim_completed = False
             st.rerun()
