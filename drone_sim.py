@@ -7,6 +7,7 @@ from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
 import random
+from datetime import datetime, timedelta
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_sidebar_state="collapsed")
@@ -50,7 +51,7 @@ st.markdown("""
         margin-bottom: 15px;
         font-family: 'Consolas', monospace;
         font-size: 0.85rem;
-        min-height: 125px; /* Keeps UI from jumping when text appears */
+        min-height: 125px; 
     }
     .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
     .log-entry { margin-bottom: 4px; }
@@ -98,6 +99,33 @@ def get_lat_lon_from_zip(zip_code):
 def get_distance_miles(p1, p2):
     return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**0.5 * 69
 
+def generate_incident():
+    incidents = [
+        ("SHOTS FIRED", "critical"),
+        ("ARMED ROBBERY", "critical"),
+        ("OFFICER IN DISTRESS", "critical"),
+        ("BURGLARY IN PROGRESS", "action"),
+        ("VEHICLE PURSUIT", "action"),
+        ("MISSING PERSON", "info"),
+        ("SUSPICIOUS ACTIVITY", "info")
+    ]
+    inc, severity = random.choice(incidents)
+    st.session_state.inc_type = inc
+    st.session_state.inc_severity = severity
+    
+    # Generate a random evening/night shift time
+    hr = random.choice(list(range(18, 24)) + list(range(0, 4)))
+    mn = random.randint(0, 59)
+    sc = random.randint(0, 59)
+    
+    base_time = datetime.now().replace(hour=hr, minute=mn, second=sc)
+    st.session_state.t_call = base_time
+    # Launch is 45-120 seconds after the call drops
+    st.session_state.t_launch = base_time + timedelta(seconds=random.randint(45, 120))
+    
+    if 't_officers' in st.session_state:
+        del st.session_state['t_officers']
+
 # --- Session State ---
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
@@ -107,11 +135,14 @@ if 'target' not in st.session_state: st.session_state.target = None
 if 'burst_mode' not in st.session_state: st.session_state.burst_mode = False
 if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
 if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
+if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 
 def reset_all():
     st.session_state.step = 1
     st.session_state.base = None
     st.session_state.target = None
+    if 't_officers' in st.session_state:
+        del st.session_state['t_officers']
 
 def generate_weather():
     st.session_state.wind_speed = random.randint(0, 40)
@@ -154,7 +185,6 @@ with right_col:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             st.success(f"Target: {dist:.2f} mi")
 
-            # Create an empty placeholder for the dynamic incident log
             incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
@@ -166,17 +196,16 @@ with right_col:
                     head_c1.markdown(f"**{row['model']}**")
                     status_placeholder = head_c2.empty()
                     
-                    # REORDERED COLUMNS: On Scene | ETA | MPH | Battery
                     m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
                         'specs': row,
                         'status_text': status_placeholder,
                         'speed_bar': st.progress(0),
-                        'metric_hover': m1.empty(), # ON SCENE FIRST
-                        'metric_eta': m2.empty(),   # ETA SECOND
-                        'metric_speed': m3.empty(), # MPH THIRD
-                        'metric_batt': m4.empty(),  # BATTERY LAST
+                        'metric_hover': m1.empty(), 
+                        'metric_eta': m2.empty(),   
+                        'metric_speed': m3.empty(), 
+                        'metric_batt': m4.empty(),  
                     }
                     drone_ui_elements.append(ui_obj)
                     st.divider()
@@ -187,9 +216,7 @@ with left_col:
     if st.session_state.base:
         folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa', icon_color='black')).add_to(m)
         
-        # Added the 8 mile ring with a distinct purple hex color (#cc00ff)
         rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000'), (8, '#cc00ff')]
-        
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
@@ -210,6 +237,7 @@ with left_col:
         elif st.session_state.target != coords:
             st.session_state.target = coords
             generate_weather()
+            generate_incident() # Fire new incident metrics when a target is marked
             st.session_state.step = 3
             st.rerun()
 
@@ -243,6 +271,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     valid = [d for d in fleet_sim_data if d['possible']]
     valid.sort(key=lambda x: x['t_total'], reverse=True) 
+    
+    fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
+    t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
+    
+    if 't_officers' not in st.session_state:
+        # Officers arrive randomly 1 to 4 minutes after the drone
+        st.session_state.t_officers = t_drone_arrival + timedelta(seconds=random.randint(60, 240))
+        
     for i, d in enumerate(valid):
         if i == 0: d['perf_color'] = "#00ff00" 
         elif i == 1: d['perf_color'] = "#ffff00" 
@@ -253,44 +289,52 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     for tick in range(101):
         curr_time = (tick / 100) * sim_dur
 
-        # Dynamic Timeline Logic
+        # Dynamic Timeline Logic (Calculates true real-world arrival times)
         log_html = f"""
         <div class="incident-log">
             <div class="log-header">📋 INCIDENT LOG</div>
-            { '<div class="log-entry"><span class="log-time">21:34</span><span class="log-critical">SHOTS FIRED</span></div>' if tick >= 0 else '' }
-            { '<div class="log-entry"><span class="log-time">21:35</span><span class="log-action">DRONE LAUNCHED</span></div>' if tick >= 15 else '' }
-            { '<div class="log-entry"><span class="log-time">21:36</span><span class="log-success">DRONE ON SCENE</span></div>' if tick >= 40 else '' }
-            { '<div class="log-entry"><span class="log-time">21:40</span><span class="log-info">OFFICERS ARRIVE</span></div>' if tick >= 80 else '' }
-        </div>
+            <div class="log-entry"><span class="log-time">{st.session_state.t_call.strftime('%H:%M:%S')}</span><span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type}</span></div>
+            <div class="log-entry"><span class="log-time">{st.session_state.t_launch.strftime('%H:%M:%S')}</span><span class="log-action">DRONE LAUNCHED</span></div>
         """
+        if curr_time >= fastest_t_out and valid:
+            log_html += f'<div class="log-entry"><span class="log-time">{t_drone_arrival.strftime("%H:%M:%S")}</span><span class="log-success">DRONE ON SCENE</span></div>'
+
+        officer_sec_since_launch = (st.session_state.t_officers - st.session_state.t_launch).total_seconds()
+        if curr_time >= officer_sec_since_launch:
+            log_html += f'<div class="log-entry"><span class="log-time">{st.session_state.t_officers.strftime("%H:%M:%S")}</span><span class="log-info">OFFICERS ARRIVE</span></div>'
+
+        log_html += "</div>"
         incident_placeholder.markdown(log_html, unsafe_allow_html=True)
 
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
                 ui['status_text'].markdown(f":red[**{d['fail_msg']}**]")
+                ui['metric_eta'].metric("TIME TO TGT", "N/A")
                 continue
             
-            phase_txt, phase_col, target_v, eta, site_time = "", "#00ffff", 0, 0, 0
+            phase_txt, phase_col, target_v, site_time = "", "#00ffff", 0, 0
             
             if curr_time < d['t_out']:
-                phase_txt, eta, target_v = ">> OUT", d['t_out'] - curr_time, d['tgt_speed']
+                phase_txt, target_v = ">> OUTBOUND", d['tgt_speed']
             elif curr_time < (d['t_out'] + d['t_hov']):
                 phase_txt, site_time, target_v = "ON SCENE", curr_time - d['t_out'], 0
             elif curr_time < d['t_total']:
-                phase_txt, eta, site_time, target_v = "<< RTB", d['t_total'] - curr_time, d['t_hov'], d['tgt_speed']
+                phase_txt, site_time, target_v = "<< RTB", d['t_hov'], d['tgt_speed']
             else:
                 phase_txt, phase_col, site_time, target_v = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov'], 0
                 d['curr_v'] = 0
 
-            # SCALED ACCELERATION (Faster Spool-up: +4 MPH per tick)
+            # Acceleration Simulation
             if d['curr_v'] < target_v: d['curr_v'] = min(target_v, d['curr_v'] + 4)
             elif d['curr_v'] > target_v: d['curr_v'] = max(target_v, d['curr_v'] - 4)
             
             ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
             ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
-            ui['metric_eta'].metric("ETA", f"{int(eta/60):02d}:{int(eta%60):02d}")
+            
+            # Locked-in Flight Time for Reference
+            ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
             # Battery Logic
