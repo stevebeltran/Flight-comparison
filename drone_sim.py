@@ -167,7 +167,6 @@ with right_col:
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
-        # Instant-trigger ZIP code input
         zip_in = st_keyup("ZIP", placeholder="Enter 5-digit ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
         
         if zip_in and len(zip_in) == 5:
@@ -232,22 +231,42 @@ with left_col:
             lat_offset = (r / 69.0)
             folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
+        # Check if an active response is underway to trigger sirens
+        is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
+
         for sq in st.session_state.squad_cars:
-            car_html = """
-            <style>
-            @keyframes carFadeIn {
-                0% { opacity: 0; transform: scale(0.3); }
-                100% { opacity: 1; transform: scale(1); }
-            }
-            .fade-car {
-                animation: carFadeIn 2.5s ease-in-out;
-                color: #00d4ff;
-                font-size: 18px;
-                text-shadow: 0 0 5px #000;
-            }
-            </style>
-            <div class="fade-car"><i class="fa fa-car"></i></div>
-            """
+            if is_responding:
+                # 75% solid blue, 25% violent red flash
+                car_html = """
+                <style>
+                @keyframes sirenPulse {
+                    0%, 75% { color: #00d4ff; text-shadow: 0 0 5px #00d4ff; transform: scale(1); }
+                    76%, 100% { color: #ff0000; text-shadow: 0 0 15px #ff0000; transform: scale(1.15); }
+                }
+                .siren-car {
+                    animation: sirenPulse 0.6s infinite;
+                    font-size: 18px;
+                }
+                </style>
+                <div class="siren-car"><i class="fa fa-car"></i></div>
+                """
+            else:
+                # Standard fade-in holding pattern
+                car_html = """
+                <style>
+                @keyframes carFadeIn {
+                    0% { opacity: 0; transform: scale(0.3); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                .fade-car {
+                    animation: carFadeIn 2.5s ease-in-out;
+                    color: #00d4ff;
+                    font-size: 18px;
+                    text-shadow: 0 0 5px #000;
+                }
+                </style>
+                <div class="fade-car"><i class="fa fa-car"></i></div>
+                """
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
