@@ -23,6 +23,7 @@ if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
 if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
+if 'sim_completed' not in st.session_state: st.session_state.sim_completed = False
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -88,7 +89,6 @@ def load_data():
             if col not in df.columns: df[col] = val
         return df
     except:
-        # Standardized speeds for rapid response since burst is removed
         data = {
             'model': ['Scout', 'Heavy-Lift', 'SKYDIO X-10'],
             'flight_time_min': [25, 40, 15],
@@ -140,7 +140,7 @@ def randomize_squads():
     """Generates 3 to 5 random squad cars around the base."""
     if st.session_state.base:
         st.session_state.squad_cars = []
-        num_cars = random.randint(3, 5) # Limited per instructions
+        num_cars = random.randint(3, 5) 
         for _ in range(num_cars):
             r_mi = random.uniform(0.5, 9.0) 
             angle = random.uniform(0, 2 * math.pi)
@@ -153,6 +153,7 @@ def reset_all():
     st.session_state.base = None
     st.session_state.target = None
     st.session_state.squad_cars = []
+    st.session_state.sim_completed = False
     if 't_officers' in st.session_state:
         del st.session_state['t_officers']
 
@@ -225,7 +226,8 @@ with left_col:
     if st.session_state.base:
         folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa')).add_to(m)
         
-        rings = [(2, '#00ff00'), (3, '#ffff00'), (4, '#ff9900'), (5, '#ff0000'), (8, '#cc00ff')]
+        # Ring values updated as requested
+        rings = [(2, '#00ff00'), (4, '#ffff00'), (6, '#ff9900'), (8, '#cc00ff')]
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
@@ -260,23 +262,26 @@ with left_col:
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         if not st.session_state.base:
             st.session_state.base = coords
-            st.session_state.map_zoom = 11 
+            # Zoom level optimized to view 8-mile range perfectly
+            st.session_state.map_zoom = 12 
             randomize_squads() 
+            st.session_state.sim_completed = False
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
             generate_weather()
             generate_incident() 
+            randomize_squads() 
             st.session_state.step = 3
+            st.session_state.sim_completed = False
             st.rerun()
 
 # ==========================================
-# SIMULATION LOOP
+# SIMULATION LOOP OR STATIC RENDER
 # ==========================================
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
     
-    # --- Officer Ground Routing Math (Closest Squad Car) ---
     best_officer_dist = float('inf')
     for sq in st.session_state.squad_cars:
         d = get_distance_miles(sq, st.session_state.target)
@@ -336,9 +341,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
-    for tick in range(101):
-        curr_time = (tick / 100) * sim_dur
-
+    def render_ui_state(curr_time, log_html_override=None):
         log_events = [
             (st.session_state.t_call, f'<span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span>'),
             (st.session_state.t_launch, '<span class="log-action">DRONE LAUNCHED</span>')
@@ -353,14 +356,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
         log_events.sort(key=lambda x: x[0])
 
-        log_html = f"""
-        <div class="incident-log">
-            <div class="log-header">📋 INCIDENT LOG</div>
-        """
-        for dt, html_str in log_events:
-            log_html += f'<div class="log-entry"><span class="log-time">{dt.strftime("%H:%M:%S")}</span>{html_str}</div>'
-        
-        log_html += "</div>"
+        if log_html_override is None:
+            log_html = f"""<div class="incident-log"><div class="log-header">📋 INCIDENT LOG</div>"""
+            for dt, html_str in log_events:
+                log_html += f'<div class="log-entry"><span class="log-time">{dt.strftime("%H:%M:%S")}</span>{html_str}</div>'
+            log_html += "</div>"
+        else:
+            log_html = log_html_override
+            
         incident_placeholder.markdown(log_html, unsafe_allow_html=True)
 
         for d in fleet_sim_data:
@@ -383,7 +386,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 phase_txt, site_time = "<< RTB", d['t_hov']
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
             else:
-                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov']
+                phase_txt, phase_col, site_time = "✓ AT STATION", d.get('perf_color', '#00ff00'), d['t_hov']
                 flight_prog = 0.0
 
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold;'>{phase_txt}</span>", unsafe_allow_html=True)
@@ -403,16 +406,21 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
-        time.sleep(0.16)
+    # If the simulation hasn't completed yet, run the timer ticks
+    if not st.session_state.sim_completed:
+        for tick in range(101):
+            curr_time = (tick / 100) * sim_dur
+            render_ui_state(curr_time)
+            time.sleep(0.16)
 
-    # --- AFTER SIMULATION ENDS ---
-    # Hold for 3 seconds so user can see "✓ SECURE" state
-    time.sleep(3.0) 
-    
-    # Trigger the map reset and car randomization
-    randomize_squads()
-    st.session_state.target = None
-    st.session_state.step = 2
-    if 't_officers' in st.session_state:
-        del st.session_state['t_officers']
-    st.rerun()
+        # Hold for 3 seconds so user can see "✓ AT STATION" state
+        time.sleep(3.0) 
+        
+        # Scramble squad cars behind the scenes, flag as complete, and rerun
+        randomize_squads()
+        st.session_state.sim_completed = True
+        st.rerun()
+        
+    # If the simulation has already run, display the final frozen state
+    else:
+        render_ui_state(sim_dur)
