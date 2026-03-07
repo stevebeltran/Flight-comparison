@@ -196,15 +196,16 @@ with right_col:
                     head_c1.markdown(f"**{row['model']}**")
                     status_placeholder = head_c2.empty()
                     
+                    # Columns updated: On Scene | ETA | ADVANTAGE | Battery
                     m1, m2, m3, m4 = st.columns(4)
                     
                     ui_obj = {
                         'specs': row,
                         'status_text': status_placeholder,
-                        'speed_bar': st.progress(0),
+                        'flight_bar': st.progress(0),
                         'metric_hover': m1.empty(), 
                         'metric_eta': m2.empty(),   
-                        'metric_speed': m3.empty(), 
+                        'metric_adv': m3.empty(), 
                         'metric_batt': m4.empty(),  
                     }
                     drone_ui_elements.append(ui_obj)
@@ -237,7 +238,7 @@ with left_col:
         elif st.session_state.target != coords:
             st.session_state.target = coords
             generate_weather()
-            generate_incident() # Fire new incident metrics when a target is marked
+            generate_incident() 
             st.session_state.step = 3
             st.rerun()
 
@@ -246,6 +247,16 @@ with left_col:
 # ==========================================
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
+    
+    # --- Officer Ground Routing Math ---
+    officer_speed_mph = 35.0
+    officer_route_dist = dist_one_way * 1.4 # Ground routes are typically 40% longer than straight-line
+    officer_travel_sec = officer_route_dist / (officer_speed_mph / 3600.0)
+    
+    # Officers assume dispatch 60 seconds after call drops
+    if 't_officers' not in st.session_state:
+        st.session_state.t_officers = st.session_state.t_call + timedelta(seconds=60) + timedelta(seconds=officer_travel_sec)
+
     fleet_sim_data = []
     
     for drone in drone_ui_elements:
@@ -265,20 +276,24 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             't_total': (t_out * 2) + (hover_sec if possible else 0),
             'batt_cap': batt_sec, 'possible': possible,
             'fail_msg': "WIND" if wind_fail else "FUEL" if hover_sec < 0 else "RANGE",
-            'tgt_speed': max_v, 'abs_max': float(specs['max_speed_mph']),
-            'curr_v': 0, 'drain': drain
+            'drain': drain
         })
 
     valid = [d for d in fleet_sim_data if d['possible']]
     valid.sort(key=lambda x: x['t_total'], reverse=True) 
     
+    # Pre-calculate advantages and arrival times
     fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
     
-    if 't_officers' not in st.session_state:
-        # Officers arrive randomly 1 to 4 minutes after the drone
-        st.session_state.t_officers = t_drone_arrival + timedelta(seconds=random.randint(60, 240))
-        
+    for d in fleet_sim_data:
+        if d['possible']:
+            drone_arrive_dt = st.session_state.t_launch + timedelta(seconds=d['t_out'])
+            adv_sec = (st.session_state.t_officers - drone_arrive_dt).total_seconds()
+            d['adv_min'] = adv_sec / 60.0
+        else:
+            d['adv_min'] = 0.0
+
     for i, d in enumerate(valid):
         if i == 0: d['perf_color'] = "#00ff00" 
         elif i == 1: d['perf_color'] = "#ffff00" 
@@ -311,30 +326,34 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             if not d['possible']:
                 ui['status_text'].markdown(f":red[**{d['fail_msg']}**]")
                 ui['metric_eta'].metric("TIME TO TGT", "N/A")
+                ui['metric_adv'].metric("ADVANTAGE", "N/A")
                 continue
             
-            phase_txt, phase_col, target_v, site_time = "", "#00ffff", 0, 0
+            phase_txt, phase_col, site_time = "", "#00ffff", 0
             
+            # Flight Progress Bar Logic (Replaces the speed bar)
             if curr_time < d['t_out']:
-                phase_txt, target_v = ">> OUTBOUND", d['tgt_speed']
+                phase_txt = ">> OUTBOUND"
+                flight_prog = curr_time / d['t_out']
             elif curr_time < (d['t_out'] + d['t_hov']):
-                phase_txt, site_time, target_v = "ON SCENE", curr_time - d['t_out'], 0
+                phase_txt, site_time = "ON SCENE", curr_time - d['t_out']
+                flight_prog = 1.0
             elif curr_time < d['t_total']:
-                phase_txt, site_time, target_v = "<< RTB", d['t_hov'], d['tgt_speed']
+                phase_txt, site_time = "<< RTB", d['t_hov']
+                flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
             else:
-                phase_txt, phase_col, site_time, target_v = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov'], 0
-                d['curr_v'] = 0
+                phase_txt, phase_col, site_time = "✓ SECURE", d.get('perf_color', '#00ff00'), d['t_hov']
+                flight_prog = 0.0
 
-            # Acceleration Simulation
-            if d['curr_v'] < target_v: d['curr_v'] = min(target_v, d['curr_v'] + 4)
-            elif d['curr_v'] > target_v: d['curr_v'] = max(target_v, d['curr_v'] - 4)
-            
             ui['status_text'].markdown(f"<span style='color:{phase_col}'>{phase_txt}</span>", unsafe_allow_html=True)
-            ui['metric_speed'].metric("MPH", f"{int(d['curr_v'])}")
-            ui['speed_bar'].progress(min(d['curr_v'] / d['abs_max'], 1.0))
+            ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # Locked-in Flight Time for Reference
+            # Locked-in Operational Metrics
             ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
+            
+            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
+            ui['metric_adv'].metric("ADVANTAGE", adv_str)
+            
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
             # Battery Logic
