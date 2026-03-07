@@ -308,7 +308,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         log_html = f"""
         <div class="incident-log">
             <div class="log-header">📋 INCIDENT LOG</div>
-            <div class="log-entry"><span class="log-time">{st.session_state.t_call.strftime('%H:%M:%S')}</span><span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type}</span></div>
+            <div class="log-entry"><span class="log-time">{st.session_state.t_call.strftime('%H:%M:%S')}</span><span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span></div>
             <div class="log-entry"><span class="log-time">{st.session_state.t_launch.strftime('%H:%M:%S')}</span><span class="log-action">DRONE LAUNCHED</span></div>
         """
         if curr_time >= fastest_t_out and valid:
@@ -362,3 +362,4 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
 
         time.sleep(0.16)
+    
