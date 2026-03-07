@@ -136,7 +136,6 @@ def generate_incident():
         del st.session_state['t_officers']
 
 def randomize_squads():
-    """Generates 3 to 5 random squad cars around the base."""
     if st.session_state.base:
         st.session_state.squad_cars = []
         num_cars = random.randint(3, 5) 
@@ -160,6 +159,29 @@ def generate_weather():
     st.session_state.wind_speed = random.randint(0, 40)
     st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
+# --- Pre-Calculate Officer Logic ---
+best_officer_dist = float('inf')
+best_officer_sq = None
+officer_travel_sec = 0
+t_officer_dispatch = None
+
+if st.session_state.base and st.session_state.target and st.session_state.squad_cars:
+    for sq in st.session_state.squad_cars:
+        d = get_distance_miles(sq, st.session_state.target)
+        if d < best_officer_dist:
+            best_officer_dist = d
+            best_officer_sq = sq
+    
+    if best_officer_dist == float('inf'): 
+        best_officer_dist = get_distance_miles(st.session_state.base, st.session_state.target)
+        best_officer_sq = st.session_state.base
+
+    # Police dispatch assumes 60 seconds after call drops
+    if 't_call' in st.session_state:
+        t_officer_dispatch = st.session_state.t_call + timedelta(seconds=60)
+        officer_travel_sec = (best_officer_dist * 1.4) / (35.0 / 3600.0)
+        st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
+
 # --- Layout ---
 left_col, right_col = st.columns([7.5, 2.5])
 
@@ -168,7 +190,6 @@ with right_col:
     
     if st.session_state.step == 1:
         zip_in = st_keyup("ZIP", placeholder="Enter 5-digit ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
-        
         if zip_in and len(zip_in) == 5:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
@@ -197,6 +218,21 @@ with right_col:
             incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
+            
+            # --- BRAND NEW SQUAD CAR TRACKER ---
+            st.markdown(f"**🚓 GROUND UNIT ({(best_officer_dist*1.4):.2f} mi route)**")
+            ui_off_status = st.empty()
+            ui_off_bar = st.progress(0)
+            mo1, mo2, mo3 = st.columns(3)
+            ui_officer = {
+                'status': ui_off_status,
+                'bar': ui_off_bar,
+                'eta': mo1.empty(),
+                'speed': mo2.empty()
+            }
+            st.divider()
+
+            # --- DRONE FLEET TRACKERS ---
             df = load_data()
             drone_ui_elements = [] 
             for index, row in df.iterrows():
@@ -206,7 +242,6 @@ with right_col:
                     status_placeholder = head_c2.empty()
                     
                     m1, m2, m3, m4 = st.columns(4)
-                    
                     ui_obj = {
                         'specs': row,
                         'status_text': status_placeholder,
@@ -231,12 +266,27 @@ with left_col:
             lat_offset = (r / 69.0)
             folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
-        # Check if an active response is underway to trigger sirens
         is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
 
         for sq in st.session_state.squad_cars:
-            if is_responding:
-                # 75% solid blue, 25% violent red flash
+            if is_responding and sq == best_officer_sq:
+                # The primary dispatched unit flashes aggressive 50/50 Red and Blue
+                car_html = """
+                <style>
+                @keyframes dispatchPulse {
+                    0%, 49% { color: #ff0000; text-shadow: 0 0 15px #ff0000; transform: scale(1.3); }
+                    50%, 100% { color: #00d4ff; text-shadow: 0 0 15px #00d4ff; transform: scale(1.3); }
+                }
+                .dispatch-car {
+                    animation: dispatchPulse 0.3s infinite;
+                    font-size: 24px;
+                    z-index: 1000;
+                }
+                </style>
+                <div class="dispatch-car"><i class="fa fa-car"></i></div>
+                """
+            elif is_responding:
+                # Other units show a slow 75/25 pulse
                 car_html = """
                 <style>
                 @keyframes sirenPulse {
@@ -244,7 +294,7 @@ with left_col:
                     76%, 100% { color: #ff0000; text-shadow: 0 0 15px #ff0000; transform: scale(1.15); }
                 }
                 .siren-car {
-                    animation: sirenPulse 0.6s infinite;
+                    animation: sirenPulse 0.8s infinite;
                     font-size: 18px;
                 }
                 </style>
@@ -271,7 +321,13 @@ with left_col:
 
     if st.session_state.target:
         folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
+        
+        # Drone straight-line path (Cyan)
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00ffff", pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
+        
+        # Officer Code 3 ground path (Red/Blue Dash)
+        if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
+            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#0055ff", pulse_color="#ff0000", weight=4, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -297,24 +353,7 @@ with left_col:
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
     
-    best_officer_dist = float('inf')
-    for sq in st.session_state.squad_cars:
-        d = get_distance_miles(sq, st.session_state.target)
-        if d < best_officer_dist:
-            best_officer_dist = d
-            
-    if best_officer_dist == float('inf'): 
-        best_officer_dist = dist_one_way
-
-    officer_speed_mph = 35.0
-    officer_route_dist = best_officer_dist * 1.4 
-    officer_travel_sec = officer_route_dist / (officer_speed_mph / 3600.0)
-    
-    if 't_officers' not in st.session_state:
-        st.session_state.t_officers = st.session_state.t_call + timedelta(seconds=60) + timedelta(seconds=officer_travel_sec)
-
     fleet_sim_data = []
-    
     for drone in drone_ui_elements:
         specs = drone['specs']
         wind_fail = st.session_state.wind_speed > float(specs['max_wind_mph'])
@@ -379,6 +418,29 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             
         incident_placeholder.markdown(log_html, unsafe_allow_html=True)
 
+        # --- Officer UI Update ---
+        current_dt = st.session_state.t_launch + timedelta(seconds=curr_time)
+        officer_time_active = (current_dt - t_officer_dispatch).total_seconds()
+        
+        if officer_time_active < 0:
+            ui_officer['status'].markdown("<span style='color:#ffa500; font-weight:bold;'>PREPARING DISPATCH</span>", unsafe_allow_html=True)
+            ui_officer['bar'].progress(0.0)
+            ui_officer['eta'].metric("ETA", f"{int(officer_travel_sec/60):02d}:{int(officer_travel_sec%60):02d}")
+            ui_officer['speed'].metric("MPH", "0")
+        elif officer_time_active < officer_travel_sec:
+            ui_officer['status'].markdown("<span style='color:#0055ff; font-weight:bold;'>>> EN ROUTE (CODE 3)</span>", unsafe_allow_html=True)
+            prog = officer_time_active / officer_travel_sec
+            ui_officer['bar'].progress(max(0.0, min(prog, 1.0)))
+            rem_sec = officer_travel_sec - officer_time_active
+            ui_officer['eta'].metric("ETA", f"{int(rem_sec/60):02d}:{int(rem_sec%60):02d}")
+            ui_officer['speed'].metric("MPH", "35")
+        else:
+            ui_officer['status'].markdown("<span style='color:#00ff00; font-weight:bold;'>✓ ON SCENE</span>", unsafe_allow_html=True)
+            ui_officer['bar'].progress(1.0)
+            ui_officer['eta'].metric("ETA", "00:00")
+            ui_officer['speed'].metric("MPH", "0")
+
+        # --- Drone Updates ---
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
@@ -407,11 +469,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             
             ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
             
-            if d['adv_min'] > 0:
-                adv_str = f"+{d['adv_min']:.1f} MIN"
-            else:
-                adv_str = f"{d['adv_min']:.1f} MIN"
-                
+            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
@@ -426,7 +484,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             time.sleep(0.16)
 
         time.sleep(3.0) 
-        randomize_squads()
         st.session_state.sim_completed = True
         st.rerun()
         
