@@ -186,6 +186,13 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
 left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
+    # --- ADD YOUR IMAGE HERE ---
+    # Replace 'your_logo_file.png' with the exact name of the file you uploaded to GitHub
+    try:
+        st.image("your_logo_file.png", use_container_width=True)
+    except:
+        pass # Silently skips if the image name is typed incorrectly or hasn't loaded yet
+        
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
@@ -453,3 +460,4 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
+
