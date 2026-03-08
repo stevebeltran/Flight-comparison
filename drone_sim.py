@@ -218,20 +218,6 @@ with right_col:
             incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
-            
-            # --- BRAND NEW SQUAD CAR TRACKER ---
-            st.markdown(f"**🚓 GROUND UNIT ({(best_officer_dist*1.4):.2f} mi route)**")
-            ui_off_status = st.empty()
-            ui_off_bar = st.progress(0)
-            mo1, mo2, mo3 = st.columns(3)
-            ui_officer = {
-                'status': ui_off_status,
-                'bar': ui_off_bar,
-                'eta': mo1.empty(),
-                'speed': mo2.empty()
-            }
-            st.divider()
-
             # --- DRONE FLEET TRACKERS ---
             df = load_data()
             drone_ui_elements = [] 
@@ -417,28 +403,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             log_html = log_html_override
             
         incident_placeholder.markdown(log_html, unsafe_allow_html=True)
-
-        # --- Officer UI Update ---
-        current_dt = st.session_state.t_launch + timedelta(seconds=curr_time)
-        officer_time_active = (current_dt - t_officer_dispatch).total_seconds()
-        
-        if officer_time_active < 0:
-            ui_officer['status'].markdown("<span style='color:#ffa500; font-weight:bold;'>PREPARING DISPATCH</span>", unsafe_allow_html=True)
-            ui_officer['bar'].progress(0.0)
-            ui_officer['eta'].metric("ETA", f"{int(officer_travel_sec/60):02d}:{int(officer_travel_sec%60):02d}")
-            ui_officer['speed'].metric("MPH", "0")
-        elif officer_time_active < officer_travel_sec:
-            ui_officer['status'].markdown("<span style='color:#0055ff; font-weight:bold;'>>> EN ROUTE (CODE 3)</span>", unsafe_allow_html=True)
-            prog = officer_time_active / officer_travel_sec
-            ui_officer['bar'].progress(max(0.0, min(prog, 1.0)))
-            rem_sec = officer_travel_sec - officer_time_active
-            ui_officer['eta'].metric("ETA", f"{int(rem_sec/60):02d}:{int(rem_sec%60):02d}")
-            ui_officer['speed'].metric("MPH", "35")
-        else:
-            ui_officer['status'].markdown("<span style='color:#00ff00; font-weight:bold;'>✓ ON SCENE</span>", unsafe_allow_html=True)
-            ui_officer['bar'].progress(1.0)
-            ui_officer['eta'].metric("ETA", "00:00")
-            ui_officer['speed'].metric("MPH", "0")
 
         # --- Drone Updates ---
         for d in fleet_sim_data:
