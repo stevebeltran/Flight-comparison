@@ -116,7 +116,7 @@ def generate_incident():
         ("ARMED ROBBERY", "critical"),
         ("OFFICER IN DISTRESS", "critical"),
         ("BURGLARY IN PROGRESS", "action"),
-        ("SUSPECT ON FOOT", "action"),
+        ("VEHICLE PURSUIT", "action"),
         ("MISSING PERSON", "info"),
         ("SUSPICIOUS ACTIVITY", "info")
     ]
@@ -186,13 +186,6 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
 left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
-    # --- ADD YOUR IMAGE HERE ---
-    # Replace 'logo.png' with the exact name of the file you uploaded to GitHub
-    try:
-        st.image("your_logo_file.png", use_container_width=True)
-    except:
-        pass # Silently skips if the image name is typed incorrectly or hasn't loaded yet
-        
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
@@ -210,7 +203,12 @@ with right_col:
     elif st.session_state.step >= 2:
         bar_c1, bar_c2 = st.columns([2.0, 1.0])
         bar_c1.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
-        if bar_c2.button("RESET"): reset_all()
+        
+        # Displays the logo in place of the old reset button
+        try:
+            bar_c2.image("logo.png", use_container_width=True)
+        except:
+            pass
         
         st.divider()
 
@@ -219,9 +217,6 @@ with right_col:
         elif not st.session_state.target:
             st.info("🎯 SET TARGET")
         else:
-            dist = get_distance_miles(st.session_state.base, st.session_state.target)
-            st.success(f"Target: {dist:.2f} mi")
-
             incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
@@ -460,5 +455,3 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
-
-
