@@ -116,7 +116,7 @@ def generate_incident():
         ("ARMED ROBBERY", "critical"),
         ("OFFICER IN DISTRESS", "critical"),
         ("BURGLARY IN PROGRESS", "action"),
-        ("VEHICLE PURSUIT", "action"),
+        ("SUSPECT ON FOOT", "action"),
         ("MISSING PERSON", "info"),
         ("SUSPICIOUS ACTIVITY", "info")
     ]
@@ -187,7 +187,7 @@ left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
     # --- ADD YOUR IMAGE HERE ---
-    # Replace 'your_logo_file.png' with the exact name of the file you uploaded to GitHub
+    # Replace 'logo.png' with the exact name of the file you uploaded to GitHub
     try:
         st.image("your_logo_file.png", use_container_width=True)
     except:
@@ -460,4 +460,5 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
+
 
