@@ -113,18 +113,19 @@ def load_data():
         df = df.dropna(subset=['model'])
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
-        
+        # Filter to only include Responder and Guardian
+        df = df[df['model'].isin(['RESPONDER', 'GUARDIAN'])]
         defaults = {'max_wind_mph': 25}
         for col, val in defaults.items():
             if col not in df.columns: df[col] = val
         return df
     except:
         data = {
-            'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
-            'flight_time_min': [42, 60, 40, 54],
-            'speed_mph': [45, 50, 45, 47],
-            'range_miles': [5, 12, 7.5, 6.2],
-            'max_wind_mph': [28, 42, 28, 26]
+            'model': ['RESPONDER', 'GUARDIAN'],
+            'flight_time_min': [42, 60],
+            'speed_mph': [45, 50],
+            'range_miles': [5, 12],
+            'max_wind_mph': [28, 42]
         }
         return pd.DataFrame(data)
 
@@ -201,16 +202,67 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
         officer_travel_sec = (best_officer_dist * 1.4) / (35.0 / 3600.0)
         st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
-# --- Layout ---
-left_col, right_col = st.columns([7.5, 2.5])
+# --- Layout: 3 Columns ---
+# Map (55%), Ops Center (27%), Financials (18%)
+left_col, mid_col, right_col = st.columns([5.5, 2.7, 1.8])
 
+# ==========================================
+# COLUMN 3: FINANCIAL IMPACT (Always visible)
+# ==========================================
 with right_col:
+    st.markdown("### 💰 BUDGET IMPACT")
+    st.divider()
+    
+    calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
+    
+    cost_officer = 82
+    cost_drone = 6
+    savings_per_call = cost_officer - cost_drone
+    annual_savings = savings_per_call * calls_per_day * 365
+    
+    # High-visibility overall savings
+    st.markdown(f"""
+    <div style="background: rgba(0, 255, 0, 0.05); border: 1px solid #00ff00; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.1);">
+        <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">ANNUAL TAXPAYER SAVINGS</h6>
+        <h2 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">${annual_savings:,.0f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Responder Break-Even
+    be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
+    st.markdown(f"""
+    <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
+        <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
+        <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$80,000</span></div>
+        <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Guardian Break-Even
+    be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
+    st.markdown(f"""
+    <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
+        <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
+        <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$160,000</span></div>
+        <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 RESET SCENARIO", use_container_width=True):
+        st.session_state.target = None
+        st.session_state.sim_completed = False
+        st.session_state.step = 2
+        st.rerun()
+
+# ==========================================
+# COLUMN 2: OPS CENTER
+# ==========================================
+with mid_col:
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
-        # Adjusted ratio for 2x larger logo
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
-        
         with zip_col:
             zip_in = st_keyup("ZIP", placeholder="ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
         with logo_col:
@@ -227,9 +279,7 @@ with right_col:
                 st.error("Invalid ZIP code. Please try again.")
 
     elif st.session_state.step >= 2:
-        # Match [1, 1, 2] ratio to prevent layout jumping
         metric_col, space_col, logo_col = st.columns([1, 1, 2])
-        
         with metric_col:
             st.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
         with logo_col:
@@ -268,6 +318,9 @@ with right_col:
                     drone_ui_elements.append(ui_obj)
                     st.divider()
 
+# ==========================================
+# COLUMN 1: MAP
+# ==========================================
 with left_col:
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
 
@@ -298,35 +351,12 @@ with left_col:
                 </style>
                 <div class="dispatch-car"><i class="fa fa-car"></i></div>
                 """
-            elif is_responding:
-                car_html = """
-                <style>
-                @keyframes sirenPulse {
-                    0%, 75% { color: #00d4ff; text-shadow: 0 0 5px #00d4ff; transform: scale(1); }
-                    76%, 100% { color: #ff0000; text-shadow: 0 0 15px #ff0000; transform: scale(1.15); }
-                }
-                .siren-car {
-                    animation: sirenPulse 0.8s infinite;
-                    font-size: 18px;
-                }
-                </style>
-                <div class="siren-car"><i class="fa fa-car"></i></div>
-                """
             else:
+                # Non-responding cars are entirely static and no longer flash
                 car_html = """
-                <style>
-                @keyframes carFadeIn {
-                    0% { opacity: 0; transform: scale(0.3); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                .fade-car {
-                    animation: carFadeIn 2.5s ease-in-out;
-                    color: #00d4ff;
-                    font-size: 18px;
-                    text-shadow: 0 0 5px #000;
-                }
-                </style>
-                <div class="fade-car"><i class="fa fa-car"></i></div>
+                <div style="color: #00d4ff; font-size: 18px; text-shadow: 0 0 5px #000;">
+                    <i class="fa fa-car"></i>
+                </div>
                 """
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
@@ -484,66 +514,3 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
-        
-        # ==========================================
-        # FINANCIAL IMPACT CALCULATOR
-        # ==========================================
-        with right_col:
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("### 💰 BUDGET IMPACT ANALYSIS")
-            st.divider()
-            
-            if valid:
-                best_drone_name = valid[0]['ui']['specs']['model']
-                unit_cost = 160000 if best_drone_name == 'GUARDIAN' else 80000
-                
-                # Interactive slider for stakeholders (Defaults to 20 per requirement)
-                calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
-                
-                # Financials
-                cost_officer = 82
-                cost_drone = 6
-                savings_per_call = cost_officer - cost_drone
-                annual_savings = savings_per_call * calls_per_day * 365
-                break_even_months = unit_cost / (savings_per_call * calls_per_day * 30.4)
-                
-                # Unit Specs
-                st.markdown(f"<span style='color:#888; font-size:0.8rem;'>RECOMMENDED ASSET:</span> **{best_drone_name}**", unsafe_allow_html=True)
-                st.markdown(f"<span style='color:#888; font-size:0.8rem;'>UNIT CAPEX:</span> **${unit_cost:,.0f}**", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                # Sub-metrics
-                c1, c2, c3 = st.columns(3)
-                c1.metric("SQUAD CAR", f"${cost_officer}")
-                c2.metric("DRONE", f"${cost_drone}")
-                c3.metric("SAVINGS/CALL", f"${savings_per_call}")
-                
-                # High-visibility Tactical ROI Output
-                st.markdown(f"""
-                <div style="
-                    background: rgba(0, 255, 0, 0.05); 
-                    border: 1px solid #00ff00; 
-                    box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.2);
-                    padding: 15px; 
-                    border-radius: 4px; 
-                    text-align: center; 
-                    margin-top: 15px;">
-                    <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">PROJECTED ANNUAL TAXPAYER SAVINGS</h6>
-                    <h1 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">
-                        ${annual_savings:,.0f}
-                    </h1>
-                    <p style="color: #00ffff; margin-top: 8px; font-size: 0.85rem; margin-bottom: 0; font-weight:bold;">
-                        BREAK-EVEN TIME: {break_even_months:.1f} MONTHS
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.error("NO CAPABLE ASSETS FOR CURRENT SCENARIO")
-                
-            # Optional Reset Button to clear the map and start a new scenario
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 RESET SIMULATION", use_container_width=True):
-                st.session_state.target = None
-                st.session_state.sim_completed = False
-                st.session_state.step = 2
-                st.rerun()
