@@ -108,15 +108,25 @@ st.markdown("""
 
 # --- Helper Functions ---
 def load_data():
-    # Only load the specific assets requested with updated ranges
-    data = {
-        'model': ['RESPONDER', 'GUARDIAN'],
-        'flight_time_min': [42, 60],
-        'speed_mph': [45, 50],
-        'range_miles': [2.0, 8.0], # Updated tactical ranges
-        'max_wind_mph': [28, 42]
-    }
-    return pd.DataFrame(data)
+    try:
+        df = pd.read_csv('drones.csv')
+        df = df.dropna(subset=['model'])
+        df['model'] = df['model'].astype(str)
+        df.columns = df.columns.str.strip()
+        defaults = {'max_wind_mph': 25}
+        for col, val in defaults.items():
+            if col not in df.columns: df[col] = val
+        return df
+    except:
+        # All 4 drones restored for the simulation, with specific ranges for Responder and Guardian
+        data = {
+            'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
+            'flight_time_min': [42, 60, 40, 54],
+            'speed_mph': [45, 50, 45, 47],
+            'range_miles': [2.0, 8.0, 7.5, 6.2], 
+            'max_wind_mph': [28, 42, 28, 26]
+        }
+        return pd.DataFrame(data)
 
 def get_lat_lon_from_zip(zip_code):
     geolocator = Nominatim(user_agent="drone_sim_performance_final")
@@ -215,7 +225,7 @@ with right_col:
     </div>
     """, unsafe_allow_html=True)
     
-    # Responder Break-Even Block
+    # Responder Break-Even Block (Hardcoded to only show Responder & Guardian)
     be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
     st.markdown(f"""
     <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
