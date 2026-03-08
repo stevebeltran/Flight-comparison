@@ -52,8 +52,20 @@ st.markdown("""
         font-size: 0.8rem;
     }
     
-    .stTextInput input, div[data-testid="stKeyup"] input { background-color: #111; color: #fff; border: 1px solid #444; }
-    h3 { margin-top: 5px !important; margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
+    /* Input Styling - Forces the ZIP box to be exactly half height */
+    .stTextInput input, div[data-testid="stKeyup"] input { 
+        background-color: #111 !important; 
+        color: #fff !important; 
+        border: 1px solid #444 !important; 
+    }
+    div[data-testid="stKeyup"] input {
+        height: 24px !important;
+        min-height: 24px !important;
+        padding: 2px 8px !important;
+        font-size: 0.85rem !important;
+    }
+
+    h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
     hr { margin: 0.5em 0 !important; border-color: #333 !important; }
 
     /* --- INCIDENT LOG CSS --- */
@@ -176,14 +188,17 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
 left_col, right_col = st.columns([7.5, 2.5])
 
 with right_col:
+    st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
-        # Step 1 Compact Header
-        c1, c2 = st.columns([1, 4])
-        c1.image("logo.png", width=60)
-        c2.markdown("### 🚁 OPS CENTER")
+        # Strict grid: ZIP box (25% width) | Spacer (50% width) | Logo (25% width)
+        zip_col, space_col, logo_col = st.columns([1, 2, 1])
         
-        zip_in = st_keyup("ZIP", placeholder="Enter 5-digit ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
+        with zip_col:
+            zip_in = st_keyup("ZIP", placeholder="ZIP", label_visibility="collapsed", max_chars=5, key="zip_input")
+        with logo_col:
+            st.image("logo.png", width='stretch')
+            
         if zip_in and len(zip_in) == 5:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
@@ -195,11 +210,14 @@ with right_col:
                 st.error("Invalid ZIP code. Please try again.")
 
     elif st.session_state.step >= 2:
-        # Step 2+ Ultra-Compact Header (Logo, Title, Wind on one row)
-        hc1, hc2, hc3 = st.columns([1, 2.5, 1.5])
-        hc1.image("logo.png", width=60)
-        hc2.markdown("### 🚁 OPS CENTER")
-        hc3.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
+        # Same strict grid to prevent the layout from jumping
+        metric_col, space_col, logo_col = st.columns([1, 2, 1])
+        
+        with metric_col:
+            st.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
+        with logo_col:
+            st.image("logo.png", width='stretch')
+        
         st.divider()
 
         if not st.session_state.base:
