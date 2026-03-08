@@ -437,7 +437,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 continue
             
             phase_txt, phase_col, site_time = "", "#00ffff", 0
-            is_active = False # Flag for pulse animation
+            is_active = False
             
             if curr_time < d['t_out']:
                 phase_txt = ">> OUTBOUND"
@@ -456,7 +456,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 0.0
                 is_active = False
 
-            # Apply Pulse class to drone name based on flight status
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
 
@@ -485,3 +484,66 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
+        
+        # ==========================================
+        # FINANCIAL IMPACT CALCULATOR
+        # ==========================================
+        with right_col:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("### 💰 BUDGET IMPACT ANALYSIS")
+            st.divider()
+            
+            if valid:
+                best_drone_name = valid[0]['ui']['specs']['model']
+                unit_cost = 160000 if best_drone_name == 'GUARDIAN' else 80000
+                
+                # Interactive slider for stakeholders (Defaults to 20 per requirement)
+                calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
+                
+                # Financials
+                cost_officer = 82
+                cost_drone = 6
+                savings_per_call = cost_officer - cost_drone
+                annual_savings = savings_per_call * calls_per_day * 365
+                break_even_months = unit_cost / (savings_per_call * calls_per_day * 30.4)
+                
+                # Unit Specs
+                st.markdown(f"<span style='color:#888; font-size:0.8rem;'>RECOMMENDED ASSET:</span> **{best_drone_name}**", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:#888; font-size:0.8rem;'>UNIT CAPEX:</span> **${unit_cost:,.0f}**", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Sub-metrics
+                c1, c2, c3 = st.columns(3)
+                c1.metric("SQUAD CAR", f"${cost_officer}")
+                c2.metric("DRONE", f"${cost_drone}")
+                c3.metric("SAVINGS/CALL", f"${savings_per_call}")
+                
+                # High-visibility Tactical ROI Output
+                st.markdown(f"""
+                <div style="
+                    background: rgba(0, 255, 0, 0.05); 
+                    border: 1px solid #00ff00; 
+                    box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.2);
+                    padding: 15px; 
+                    border-radius: 4px; 
+                    text-align: center; 
+                    margin-top: 15px;">
+                    <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">PROJECTED ANNUAL TAXPAYER SAVINGS</h6>
+                    <h1 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">
+                        ${annual_savings:,.0f}
+                    </h1>
+                    <p style="color: #00ffff; margin-top: 8px; font-size: 0.85rem; margin-bottom: 0; font-weight:bold;">
+                        BREAK-EVEN TIME: {break_even_months:.1f} MONTHS
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error("NO CAPABLE ASSETS FOR CURRENT SCENARIO")
+                
+            # Optional Reset Button to clear the map and start a new scenario
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 RESET SIMULATION", use_container_width=True):
+                st.session_state.target = None
+                st.session_state.sim_completed = False
+                st.session_state.step = 2
+                st.rerun()
