@@ -176,7 +176,6 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
         best_officer_dist = get_distance_miles(st.session_state.base, st.session_state.target)
         best_officer_sq = st.session_state.base
 
-    # Police dispatch assumes 60 seconds after call drops
     if 't_call' in st.session_state:
         t_officer_dispatch = st.session_state.t_call + timedelta(seconds=60)
         officer_travel_sec = (best_officer_dist * 1.4) / (35.0 / 3600.0)
@@ -204,11 +203,8 @@ with right_col:
         bar_c1, bar_c2 = st.columns([2.0, 1.0])
         bar_c1.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
         
-        # Displays the logo in place of the old reset button
-        try:
-            bar_c2.image("logo.png", use_container_width=True)
-        except:
-            pass
+        # Display the logo (updated parameter, removed try/except to debug path)
+        bar_c2.image("logo.png", width='stretch')
         
         st.divider()
 
@@ -220,7 +216,6 @@ with right_col:
             incident_placeholder = st.empty()
 
         if st.session_state.step == 3:
-            # --- DRONE FLEET TRACKERS ---
             df = load_data()
             drone_ui_elements = [] 
             for index, row in df.iterrows():
@@ -258,7 +253,6 @@ with left_col:
 
         for sq in st.session_state.squad_cars:
             if is_responding and sq == best_officer_sq:
-                # The primary dispatched unit flashes aggressive 50/50 Red and Blue
                 car_html = """
                 <style>
                 @keyframes dispatchPulse {
@@ -274,7 +268,6 @@ with left_col:
                 <div class="dispatch-car"><i class="fa fa-car"></i></div>
                 """
             elif is_responding:
-                # Other units show a slow 75/25 pulse
                 car_html = """
                 <style>
                 @keyframes sirenPulse {
@@ -289,7 +282,6 @@ with left_col:
                 <div class="siren-car"><i class="fa fa-car"></i></div>
                 """
             else:
-                # Standard fade-in holding pattern
                 car_html = """
                 <style>
                 @keyframes carFadeIn {
@@ -310,10 +302,8 @@ with left_col:
     if st.session_state.target:
         folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
         
-        # Drone straight-line path (Cyan)
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00ffff", pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
         
-        # Officer Code 3 ground path (Red/Blue Dash)
         if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
             plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#0055ff", pulse_color="#ff0000", weight=4, delay=400, dash_array=[15, 30]).add_to(m)
 
