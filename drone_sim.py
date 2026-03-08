@@ -25,6 +25,7 @@ if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 if 'sim_completed' not in st.session_state: st.session_state.sim_completed = False
+if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -207,52 +208,55 @@ left_col, mid_col, right_col = st.columns([5.5, 2.7, 1.8])
 # COLUMN 3: FINANCIAL IMPACT
 # ==========================================
 with right_col:
-    st.markdown("### 💰 BUDGET IMPACT")
-    st.divider()
-    
-    calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
-    
-    cost_officer = 82
-    cost_drone = 6
-    savings_per_call = cost_officer - cost_drone
-    annual_savings = savings_per_call * calls_per_day * 365
-    
-    # High-visibility overall savings
-    st.markdown(f"""
-    <div style="background: rgba(0, 255, 0, 0.05); border: 1px solid #00ff00; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.1);">
-        <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">ANNUAL TAXPAYER SAVINGS</h6>
-        <h2 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">${annual_savings:,.0f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Responder Break-Even Block (Hardcoded to only show Responder & Guardian)
-    be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
-    st.markdown(f"""
-    <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
-        <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
-        <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">2 MI RADIUS</span></div>
-        <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$80,000</span></div>
-        <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Guardian Break-Even Block
-    be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
-    st.markdown(f"""
-    <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
-        <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
-        <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">8 MI RADIUS</span></div>
-        <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$160,000</span></div>
-        <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Stays completely hidden until a simulation completes at least once
+    if st.session_state.has_run_once:
+        st.markdown("### 💰 BUDGET IMPACT")
+        st.divider()
+        
+        calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
+        
+        cost_officer = 82
+        cost_drone = 6
+        savings_per_call = cost_officer - cost_drone
+        annual_savings = savings_per_call * calls_per_day * 365
+        
+        # High-visibility overall savings
+        st.markdown(f"""
+        <div style="background: rgba(0, 255, 0, 0.05); border: 1px solid #00ff00; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.1);">
+            <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">ANNUAL TAXPAYER SAVINGS</h6>
+            <h2 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">${annual_savings:,.0f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Responder Break-Even Block (Hardcoded to only show Responder & Guardian)
+        be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
+        st.markdown(f"""
+        <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
+            <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
+            <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">2 MI RADIUS</span></div>
+            <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$80,000</span></div>
+            <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Guardian Break-Even Block
+        be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
+        st.markdown(f"""
+        <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
+            <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
+            <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">8 MI RADIUS</span></div>
+            <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$160,000</span></div>
+            <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔄 RESET SCENARIO", use_container_width=True):
-        st.session_state.target = None
-        st.session_state.sim_completed = False
-        st.session_state.step = 2
-        st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 RESET SCENARIO", use_container_width=True):
+            st.session_state.target = None
+            st.session_state.sim_completed = False
+            st.session_state.has_run_once = False # Hides the column entirely upon full reset
+            st.session_state.step = 2
+            st.rerun()
 
 # ==========================================
 # COLUMN 2: OPS CENTER
@@ -510,6 +514,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
         time.sleep(3.0) 
         st.session_state.sim_completed = True
+        st.session_state.has_run_once = True  # <--- Unlocks the Financial Column
         st.rerun()
         
     else:
