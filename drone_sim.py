@@ -200,16 +200,19 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
         officer_travel_sec = (best_officer_dist * 1.4) / (35.0 / 3600.0)
         st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
-# --- Layout: 3 Columns ---
-# Map (55%), Ops Center (27%), Financials (18%)
-left_col, mid_col, right_col = st.columns([5.5, 2.7, 1.8])
+# --- Layout: Dynamic Columns ---
+# Expands to 2 columns initially, then compresses to 3 columns after the simulation
+if st.session_state.has_run_once:
+    left_col, mid_col, right_col = st.columns([5.5, 2.7, 1.8])
+else:
+    left_col, mid_col = st.columns([6.7, 3.3])
+    right_col = None
 
 # ==========================================
 # COLUMN 3: FINANCIAL IMPACT
 # ==========================================
-with right_col:
-    # Stays completely hidden until a simulation completes at least once
-    if st.session_state.has_run_once:
+if right_col is not None:
+    with right_col:
         st.markdown("### 💰 BUDGET IMPACT")
         st.divider()
         
@@ -228,7 +231,7 @@ with right_col:
         </div>
         """, unsafe_allow_html=True)
         
-        # Responder Break-Even Block (Hardcoded to only show Responder & Guardian)
+        # Responder Break-Even Block
         be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
         st.markdown(f"""
         <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
