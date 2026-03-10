@@ -354,7 +354,7 @@ with left_col:
         for sq in st.session_state.squad_cars:
             # Squad cars start #00D2FF. During response, only the best squad stays #00D2FF, others dim to #444444
             if is_responding:
-                car_color = "#00D2FF" if sq == best_officer_sq else "#444444"
+                car_color = "#FB5D3B" if sq == best_officer_sq else "#444444"
             else:
                 car_color = "#00D2FF"
 
@@ -523,4 +523,5 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
+
 
