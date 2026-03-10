@@ -232,7 +232,7 @@ with mid_col:
             st.markdown("### BUDGET IMPACT")
             st.divider()
             
-            calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
+            calls_per_day = st.slider("ESTIMATED DAILY CALLS DIVERTED", min_value=1, max_value=100, value=20)
             
             cost_officer = 82
             cost_drone = 6
@@ -523,3 +523,4 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
+
