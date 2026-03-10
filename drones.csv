@@ -1,7 +1,8 @@
 model,flight_time_min,speed_mph,range_miles,max_wind_mph
 RESPONDER,42,30,5,28
 GUARDIAN,60,50,12,42
-SKYDIO X-10,33,45,7.5,28.6
+SKYDIO X-10,33,36,7.5,28.6
 MATRICE 4TD,54,34,6.2,26.8
+
 
 
