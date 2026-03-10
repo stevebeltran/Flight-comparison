@@ -20,8 +20,6 @@ if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283,
 if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 13
 if 'base' not in st.session_state: st.session_state.base = None
 if 'target' not in st.session_state: st.session_state.target = None
-if 'wind_speed' not in st.session_state: st.session_state.wind_speed = 0
-if 'wind_dir' not in st.session_state: st.session_state.wind_dir = "N"
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 if 'sim_completed' not in st.session_state: st.session_state.sim_completed = False
@@ -134,9 +132,6 @@ def load_data():
         df = df.dropna(subset=['model'])
         df['model'] = df['model'].astype(str)
         df.columns = df.columns.str.strip()
-        defaults = {'max_wind_mph': 25}
-        for col, val in defaults.items():
-            if col not in df.columns: df[col] = val
         return df
     except:
         # Fallback dictionary with updated Cruise Speeds
@@ -144,8 +139,7 @@ def load_data():
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
             'flight_time_min': [42, 60, 40, 54],
             'speed_mph': [22, 30, 36, 34],
-            'range_miles': [5.0, 12.0, 7.5, 6.2], 
-            'max_wind_mph': [28.0, 42.0, 28.6, 26.8]
+            'range_miles': [5.0, 12.0, 7.5, 6.2]
         }
         return pd.DataFrame(data)
 
@@ -193,10 +187,6 @@ def randomize_squads():
             d_lat = (r_mi * math.sin(angle)) / 69.172
             d_lon = (r_mi * math.cos(angle)) / (69.172 * math.cos(math.radians(st.session_state.base[0])))
             st.session_state.squad_cars.append([st.session_state.base[0] + d_lat, st.session_state.base[1] + d_lon])
-
-def generate_weather():
-    st.session_state.wind_speed = random.randint(0, 40)
-    st.session_state.wind_dir = random.choice(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
 # --- Pre-Calculate Officer Logic ---
 best_officer_dist = float('inf')
@@ -285,16 +275,13 @@ with mid_col:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
                 st.session_state.map_center = coords
-                generate_weather()
                 st.session_state.step = 2
                 st.rerun()
             else:
                 st.error("Invalid ZIP code.")
 
     elif st.session_state.step >= 2:
-        metric_col, space_col, logo_col = st.columns([1, 1, 2])
-        with metric_col:
-            st.metric("WIND", f"{st.session_state.wind_speed} {st.session_state.wind_dir}")
+        _col1, _col2, logo_col = st.columns([1, 1, 2])
         with logo_col:
             st.image("logo.png", use_container_width=True)
         
@@ -396,7 +383,6 @@ with left_col:
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
-            generate_weather()
             generate_incident() 
             st.session_state.step = 3
             st.session_state.sim_completed = False
@@ -411,20 +397,19 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     fleet_sim_data = []
     for drone in drone_ui_elements:
         specs = drone['specs']
-        wind_fail = st.session_state.wind_speed > float(specs['max_wind_mph'])
         max_v = float(specs['speed_mph'])
         
         t_out = dist_one_way / (max_v / 3600)
         batt_sec = float(specs['flight_time_min']) * 60
         hover_sec = (batt_sec * 0.80) - (t_out * 2)
         
-        possible = not wind_fail and hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
+        possible = hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
         fleet_sim_data.append({
             'ui': drone, 't_out': t_out, 't_hov': hover_sec if possible else 0,
             't_total': (t_out * 2) + (hover_sec if possible else 0),
             'batt_cap': batt_sec, 'possible': possible,
-            'fail_msg': "WIND" if wind_fail else "FUEL" if hover_sec < 0 else "RANGE"
+            'fail_msg': "FUEL" if hover_sec < 0 else "RANGE"
         })
 
     valid = [d for d in fleet_sim_data if d['possible']]
