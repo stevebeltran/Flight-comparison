@@ -239,9 +239,10 @@ with mid_col:
             savings_per_call = cost_officer - cost_drone
             annual_savings = savings_per_call * calls_per_day * 365
             
+            # Themed purely in Brinc Blue (00D2FF)
             st.markdown(f"""
-            <div style="background: #111; border: 1px solid #333; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                <h6 style="color: #ffffff; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">ANNUAL TAXPAYER SAVINGS</h6>
+            <div style="background: rgba(0, 210, 255, 0.05); border: 1px solid #00D2FF; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 212, 255, 0.1);">
+                <h6 style="color: #00D2FF; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">ANNUAL TAXPAYER SAVINGS</h6>
                 <h2 style="color: #00D2FF; margin: 0; font-family: 'IBM Plex Mono', monospace;">${annual_savings:,.0f}</h2>
             </div>
             """, unsafe_allow_html=True)
@@ -348,10 +349,17 @@ with left_col:
             lat_offset = (r / 69.0)
             folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
+        is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
+
         for sq in st.session_state.squad_cars:
-            # Squad cars are now statically colored Emergency Orange (#FB5D3B)
-            car_html = """
-            <div style="color: #FB5D3B; font-size: 18px; text-shadow: 0 0 5px #000;">
+            # Squad cars start #00D2FF. During response, only the best squad stays #00D2FF, others dim to #444444
+            if is_responding:
+                car_color = "#00D2FF" if sq == best_officer_sq else "#444444"
+            else:
+                car_color = "#00D2FF"
+
+            car_html = f"""
+            <div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;">
                 <i class="fa fa-car"></i>
             </div>
             """
@@ -364,7 +372,7 @@ with left_col:
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
         if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
-            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#FB5D3B", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
+            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -510,6 +518,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
+        randomize_squads() # Randomizes squad locations immediately after the flight
         st.rerun()
         
     else:
