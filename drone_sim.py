@@ -30,34 +30,62 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Manrope:wght@400;600;700&display=swap');
+
     header[data-testid="stHeader"] { display: none; }
-    .stApp { background-color: #050505 !important; color: #e0e0e0; }
+    
+    /* Global Typography & Colors */
+    .stApp { 
+        background-color: #050505 !important; 
+        color: #797979; 
+        font-family: 'Manrope', sans-serif;
+    }
+    
+    h1, h2, h3, h4, h5, h6 { 
+        color: #ffffff !important; 
+        font-family: 'Manrope', sans-serif;
+        margin-bottom: 0px !important; 
+        padding-bottom: 0px !important; 
+    }
+    
+    h3 { font-size: 1.2rem !important; }
+    
     .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
     div.stVerticalBlock > div { gap: 0.5rem !important; }
     
+    /* Metrics */
     div[data-testid="stMetricValue"] {
         font-size: 1.1rem !important;
-        color: #ffa500; 
-        font-family: 'Consolas', monospace;
-        text-shadow: 0px 0px 4px rgba(255, 165, 0, 0.5);
+        color: #00D2FF; 
+        font-family: 'IBM Plex Mono', monospace;
     }
-    div[data-testid="stMetricLabel"] { font-size: 0.6rem !important; color: #888; margin-bottom: -5px; }
+    div[data-testid="stMetricLabel"] { 
+        font-size: 0.6rem !important; 
+        color: #797979; 
+        margin-bottom: -5px; 
+    }
 
     .stProgress > div > div { height: 6px !important; }
-    .stProgress > div > div > div > div { background-color: #00d4ff; }
+    .stProgress > div > div > div > div { background-color: #00D2FF; }
 
-    div.stButton > button {
-        background-color: #222;
-        color: #00d4ff;
-        border: 1px solid #00d4ff;
+    div.stButton > button, div[data-testid="stPopover"] > button {
+        background-color: #111;
+        color: #ffffff;
+        border: 1px solid #444;
         font-size: 0.8rem;
+        font-family: 'Manrope', sans-serif;
+    }
+    div.stButton > button:hover, div[data-testid="stPopover"] > button:hover {
+        border-color: #00D2FF;
+        color: #00D2FF;
     }
     
     /* Input Styling */
     .stTextInput input, div[data-testid="stKeyup"] input { 
         background-color: #111 !important; 
-        color: #fff !important; 
+        color: #ffffff !important; 
         border: 1px solid #444 !important; 
+        font-family: 'IBM Plex Mono', monospace;
     }
     div[data-testid="stKeyup"] input {
         height: 24px !important;
@@ -66,25 +94,15 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    h3 { margin-bottom: 0px !important; padding-bottom: 0px !important; font-size: 1.2rem !important; color: #fff;}
     hr { margin: 0.5em 0 !important; border-color: #333 !important; }
 
-    /* --- TACTICAL LOGO GLOW --- */
-    [data-testid="stImage"] {
-        border: 1px solid #00d4ff;
-        border-radius: 4px;
-        padding: 5px;
-        box-shadow: 0px 0px 15px rgba(0, 212, 255, 0.3);
-        background: rgba(0, 212, 255, 0.05);
-    }
-
-    /* --- DRONE NAME PULSE --- */
+    /* --- DRONE NAME PULSE (BRINC BLUE) --- */
     @keyframes dronePulse {
-        0%, 75% { color: #00d4ff; text-shadow: 0 0 5px #00d4ff; }
-        76%, 100% { color: #ff0000; text-shadow: 0 0 15px #ff0000; }
+        0%, 49% { color: #797979; text-shadow: none; }
+        50%, 100% { color: #00D2FF; text-shadow: 0 0 10px #00D2FF; }
     }
-    .drone-active { animation: dronePulse 0.8s infinite; font-weight: bold; }
-    .drone-static { color: #e0e0e0; font-weight: bold; text-shadow: none; }
+    .drone-active { animation: dronePulse 0.8s infinite; font-weight: bold; font-family: 'IBM Plex Mono', monospace; }
+    .drone-static { color: #ffffff; font-weight: bold; text-shadow: none; font-family: 'IBM Plex Mono', monospace; }
 
     /* --- INCIDENT LOG CSS --- */
     .incident-log {
@@ -93,17 +111,19 @@ st.markdown("""
         border-radius: 5px;
         padding: 10px;
         margin-bottom: 15px;
-        font-family: 'Consolas', monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 0.85rem;
         min-height: 125px; 
     }
-    .log-header { color: #fff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
-    .log-entry { margin-bottom: 4px; }
-    .log-time { color: #888; margin-right: 12px; }
-    .log-critical { color: #ff0000; font-weight: bold; }
-    .log-action { color: #00ffff; font-weight: bold; }
-    .log-success { color: #00ff00; font-weight: bold; }
-    .log-info { color: #ffa500; font-weight: bold; }
+    .log-header { color: #ffffff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
+    .log-entry { margin-bottom: 4px; color: #797979; }
+    .log-time { color: #797979; margin-right: 12px; }
+    
+    /* Muted Log Colors */
+    .log-critical { color: #ffffff; font-weight: bold; }
+    .log-action { color: #00D2FF; font-weight: bold; }
+    .log-success { color: #00D2FF; font-weight: bold; }
+    .log-info { color: #797979; font-weight: normal; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -119,7 +139,6 @@ def load_data():
             if col not in df.columns: df[col] = val
         return df
     except:
-        # All 4 drones restored for the simulation, with specific ranges for Responder and Guardian
         data = {
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
             'flight_time_min': [42, 60, 40, 54],
@@ -201,70 +220,59 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
         st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
 # --- Layout: Dynamic Columns ---
-# Expands to 2 columns initially, then compresses to 3 columns after the simulation
-if st.session_state.has_run_once:
-    left_col, mid_col, right_col = st.columns([5.5, 2.7, 1.8])
-else:
-    left_col, mid_col = st.columns([6.7, 3.3])
-    right_col = None
+left_col, mid_col = st.columns([7, 3])
 
 # ==========================================
-# COLUMN 3: FINANCIAL IMPACT
-# ==========================================
-if right_col is not None:
-    with right_col:
-        st.markdown("### 💰 BUDGET IMPACT")
-        st.divider()
-        
-        calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
-        
-        cost_officer = 82
-        cost_drone = 6
-        savings_per_call = cost_officer - cost_drone
-        annual_savings = savings_per_call * calls_per_day * 365
-        
-        # High-visibility overall savings
-        st.markdown(f"""
-        <div style="background: rgba(0, 255, 0, 0.05); border: 1px solid #00ff00; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 255, 0, 0.1);">
-            <h6 style="color: #888; margin: 0; font-size: 0.8rem; letter-spacing: 1px;">ANNUAL TAXPAYER SAVINGS</h6>
-            <h2 style="color: #00ff00; margin: 0; font-family: 'Consolas', monospace; text-shadow: 0 0 10px rgba(0,255,0,0.5);">${annual_savings:,.0f}</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Responder Break-Even Block
-        be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
-        st.markdown(f"""
-        <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
-            <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
-            <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">2 MI RADIUS</span></div>
-            <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$80,000</span></div>
-            <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Guardian Break-Even Block
-        be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
-        st.markdown(f"""
-        <div style="border: 1px solid #444; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #111;">
-            <h5 style="color: #00ffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
-            <div style="color: #888; font-size: 0.85rem;">COVERAGE: <span style="color:#fff;">8 MI RADIUS</span></div>
-            <div style="color: #888; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#fff;">$160,000</span></div>
-            <div style="color: #888; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00ff00; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 RESET SCENARIO", use_container_width=True):
-            st.session_state.target = None
-            st.session_state.sim_completed = False
-            st.session_state.has_run_once = False # Hides the column entirely upon full reset
-            st.session_state.step = 2
-            st.rerun()
-
-# ==========================================
-# COLUMN 2: OPS CENTER
+# COLUMN 2: OPS CENTER & BUDGET BUTTON
 # ==========================================
 with mid_col:
+    # Top Actions Area (Budget is now a button)
+    if st.session_state.has_run_once:
+        with st.popover("💰 VIEW BUDGET IMPACT", use_container_width=True):
+            st.markdown("### BUDGET IMPACT")
+            st.divider()
+            
+            calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
+            
+            cost_officer = 82
+            cost_drone = 6
+            savings_per_call = cost_officer - cost_drone
+            annual_savings = savings_per_call * calls_per_day * 365
+            
+            st.markdown(f"""
+            <div style="background: #111; border: 1px solid #333; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                <h6 style="color: #ffffff; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">ANNUAL TAXPAYER SAVINGS</h6>
+                <h2 style="color: #00D2FF; margin: 0; font-family: 'IBM Plex Mono', monospace;">${annual_savings:,.0f}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
+            st.markdown(f"""
+            <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
+                <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
+                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">2 MI RADIUS</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$80,000</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
+            st.markdown(f"""
+            <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
+                <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
+                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">8 MI RADIUS</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$160,000</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if st.button("🔄 RESET SCENARIO", use_container_width=True):
+                st.session_state.target = None
+                st.session_state.sim_completed = False
+                st.session_state.has_run_once = False 
+                st.session_state.step = 2
+                st.rerun()
+
     st.markdown("### 🚁 OPS CENTER")
     
     if st.session_state.step == 1:
@@ -333,47 +341,30 @@ with left_col:
     if st.session_state.base:
         folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa')).add_to(m)
         
-        # Display the 2 and 8 mile tactical rings to match the models
-        rings = [(2, '#00ff00'), (4, '#ffff00'), (6, '#ff9900'), (8, '#cc00ff')]
+        # Muted rings
+        rings = [(2, '#00D2FF'), (4, '#ffffff'), (6, '#797979'), (8, '#444444')]
         for r, c in rings:
-            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=2, fill=False, opacity=0.9, dash_array='4, 8').add_to(m)
+            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
-            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-size:10px; font-weight:900; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
-
-        is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
+            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
         for sq in st.session_state.squad_cars:
-            if is_responding and sq == best_officer_sq:
-                car_html = """
-                <style>
-                @keyframes dispatchPulse {
-                    0%, 49% { color: #ff0000; text-shadow: 0 0 15px #ff0000; transform: scale(1.3); }
-                    50%, 100% { color: #00d4ff; text-shadow: 0 0 15px #00d4ff; transform: scale(1.3); }
-                }
-                .dispatch-car {
-                    animation: dispatchPulse 0.3s infinite;
-                    font-size: 24px;
-                    z-index: 1000;
-                }
-                </style>
-                <div class="dispatch-car"><i class="fa fa-car"></i></div>
-                """
-            else:
-                # Non-responding cars are entirely static and no longer flash
-                car_html = """
-                <div style="color: #00d4ff; font-size: 18px; text-shadow: 0 0 5px #000;">
-                    <i class="fa fa-car"></i>
-                </div>
-                """
+            # Squad cars are now statically colored Emergency Orange (#FB5D3B)
+            car_html = """
+            <div style="color: #FB5D3B; font-size: 18px; text-shadow: 0 0 5px #000;">
+                <i class="fa fa-car"></i>
+            </div>
+            """
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
-        folium.Marker(st.session_state.target, icon=folium.Icon(color='red', icon='crosshairs', prefix='fa')).add_to(m)
+        # Crosshairs rendered in pure white
+        folium.Marker(st.session_state.target, icon=folium.Icon(color='white', icon='crosshairs', prefix='fa')).add_to(m)
         
-        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00ffff", pulse_color="#ffffff", weight=4, delay=800, dash_array=[10, 20]).add_to(m)
+        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
         if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
-            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#0055ff", pulse_color="#ff0000", weight=4, delay=400, dash_array=[15, 30]).add_to(m)
+            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#FB5D3B", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -432,10 +423,11 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             d['adv_min'] = 0.0
 
+    # Adjusted performance colors for the minimalist theme
     for i, d in enumerate(valid):
-        if i == 0: d['perf_color'] = "#00ff00" 
-        elif i == 1: d['perf_color'] = "#ffff00" 
-        else: d['perf_color'] = "#ff0000" 
+        if i == 0: d['perf_color'] = "#00D2FF" 
+        elif i == 1: d['perf_color'] = "#ffffff" 
+        else: d['perf_color'] = "#797979" 
 
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
@@ -467,13 +459,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
-                ui['status_text'].markdown(f":red[**{d['fail_msg']}**]")
+                ui['status_text'].markdown(f"<span style='color:#797979; font-weight:bold;'>{d['fail_msg']}</span>", unsafe_allow_html=True)
                 ui['metric_eta'].metric("TIME TO TGT", "N/A")
                 ui['metric_adv'].metric("ADVANTAGE", "N/A")
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
                 continue
             
-            phase_txt, phase_col, site_time = "", "#00ffff", 0
+            phase_txt, phase_col, site_time = "", "#00D2FF", 0
             is_active = False
             
             if curr_time < d['t_out']:
@@ -489,14 +481,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
                 is_active = True
             else:
-                phase_txt, phase_col, site_time = "✓ AT STATION", d.get('perf_color', '#00ff00'), d['t_hov']
+                phase_txt, phase_col, site_time = "✓ AT STATION", d.get('perf_color', '#ffffff'), d['t_hov']
                 flight_prog = 0.0
                 is_active = False
 
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
 
-            ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold;'>{phase_txt}</span>", unsafe_allow_html=True)
+            ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
             ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
@@ -517,7 +509,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
         time.sleep(3.0) 
         st.session_state.sim_completed = True
-        st.session_state.has_run_once = True  # <--- Unlocks the Financial Column
+        st.session_state.has_run_once = True 
         st.rerun()
         
     else:
