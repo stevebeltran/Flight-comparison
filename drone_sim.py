@@ -139,12 +139,13 @@ def load_data():
             if col not in df.columns: df[col] = val
         return df
     except:
+        # Fallback dictionary with updated Cruise Speeds
         data = {
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
             'flight_time_min': [42, 60, 40, 54],
-            'speed_mph': [45, 50, 45, 47],
-            'range_miles': [2.0, 8.0, 7.5, 6.2], 
-            'max_wind_mph': [28, 42, 28, 26]
+            'speed_mph': [22, 30, 36, 34],
+            'range_miles': [5.0, 12.0, 7.5, 6.2], 
+            'max_wind_mph': [28.0, 42.0, 28.6, 26.8]
         }
         return pd.DataFrame(data)
 
@@ -226,24 +227,21 @@ left_col, mid_col = st.columns([7, 3])
 # COLUMN 2: OPS CENTER & BUDGET BUTTON
 # ==========================================
 with mid_col:
-    # Top Actions Area (Budget is now a button)
+    # Top Actions Area
     if st.session_state.has_run_once:
         with st.popover("💰 VIEW BUDGET IMPACT", use_container_width=True):
             st.markdown("### BUDGET IMPACT")
             st.divider()
             
-            calls_per_day = st.slider("ESTIMATED DAILY CALLS DIVERTED", min_value=1, max_value=100, value=20)
-            
+            calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
             cost_officer = 82
             cost_drone = 6
             savings_per_call = cost_officer - cost_drone
-            annual_savings = savings_per_call * calls_per_day * 365
             
-            # Themed purely in Brinc Blue (00D2FF)
             st.markdown(f"""
             <div style="background: rgba(0, 210, 255, 0.05); border: 1px solid #00D2FF; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 212, 255, 0.1);">
                 <h6 style="color: #00D2FF; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">ANNUAL TAXPAYER SAVINGS</h6>
-                <h2 style="color: #00D2FF; margin: 0; font-family: 'IBM Plex Mono', monospace;">${annual_savings:,.0f}</h2>
+                <h2 style="color: #00D2FF; margin: 0; font-family: 'IBM Plex Mono', monospace;">$554,800</h2>
             </div>
             """, unsafe_allow_html=True)
             
@@ -251,7 +249,7 @@ with mid_col:
             st.markdown(f"""
             <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
                 <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
-                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">2 MI RADIUS</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">5 MI RADIUS</span></div>
                 <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$80,000</span></div>
                 <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
             </div>
@@ -261,7 +259,7 @@ with mid_col:
             st.markdown(f"""
             <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
                 <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
-                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">8 MI RADIUS</span></div>
+                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">12 MI RADIUS</span></div>
                 <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$160,000</span></div>
                 <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
             </div>
@@ -340,9 +338,14 @@ with left_col:
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
 
     if st.session_state.base:
-        folium.Marker(st.session_state.base, icon=folium.Icon(color='white', icon='home', prefix='fa')).add_to(m)
+        # Changed Base icon to Custom DivIcon (Brinc Blue)
+        base_html = """
+        <div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;">
+            <i class="fa fa-home"></i>
+        </div>
+        """
+        folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
         
-        # Muted rings
         rings = [(2, '#00D2FF'), (4, '#ffffff'), (6, '#797979'), (8, '#444444')]
         for r, c in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
@@ -352,10 +355,11 @@ with left_col:
         is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
 
         for sq in st.session_state.squad_cars:
-            # Squad cars start #00D2FF. During response, only the best squad stays #00D2FF, others dim to #444444
             if is_responding:
-                car_color = "#FB5D3B" if sq == best_officer_sq else "#444444"
+                # Active responding car turns Red, remaining idle cars stay Brinc Blue
+                car_color = "#FF0000" if sq == best_officer_sq else "#00D2FF"
             else:
+                # All idle cars start Brinc Blue
                 car_color = "#00D2FF"
 
             car_html = f"""
@@ -366,13 +370,19 @@ with left_col:
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
-        # Crosshairs rendered in pure white
-        folium.Marker(st.session_state.target, icon=folium.Icon(color='white', icon='crosshairs', prefix='fa')).add_to(m)
+        # Changed Target icon to Custom DivIcon (Red)
+        target_html = """
+        <div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;">
+            <i class="fa fa-crosshairs"></i>
+        </div>
+        """
+        folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
         
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
         if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
-            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
+            # Responding Car Path is also Red
+            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -431,7 +441,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             d['adv_min'] = 0.0
 
-    # Adjusted performance colors for the minimalist theme
     for i, d in enumerate(valid):
         if i == 0: d['perf_color'] = "#00D2FF" 
         elif i == 1: d['perf_color'] = "#ffffff" 
@@ -518,10 +527,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
-        randomize_squads() # Randomizes squad locations immediately after the flight
+        randomize_squads() 
         st.rerun()
         
     else:
         render_ui_state(sim_dur)
-
-
