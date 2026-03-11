@@ -66,6 +66,7 @@ st.markdown("""
     .stProgress > div > div { height: 6px !important; }
     .stProgress > div > div > div > div { background-color: #00D2FF; }
 
+    /* Button and Popover Styling */
     div.stButton > button, div[data-testid="stPopover"] > button {
         background-color: #111;
         color: #ffffff;
@@ -76,6 +77,12 @@ st.markdown("""
     div.stButton > button:hover, div[data-testid="stPopover"] > button:hover {
         border-color: #00D2FF;
         color: #00D2FF;
+    }
+
+    /* Force Popover Body to be Black */
+    div[data-testid="stPopoverBody"] {
+        background-color: #0a0a0a !important;
+        border: 1px solid #333 !important;
     }
     
     /* Input Styling */
@@ -243,24 +250,35 @@ with mid_col:
         if st.session_state.target and st.session_state.base:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             
-            # Estimate Helicopter Metrics: locked to Guardian's 60 min flight time
-            heli_time_hr = 1.0  # 60 minutes
+            # Estimate Helicopter Metrics: locked to 60 min flight time
+            heli_time_hr = 1.0  
             heli_cost = heli_time_hr * 850 
             
             with st.popover("🚁 VIEW AIR ASSET COST", use_container_width=True):
-                st.markdown("### TRADITIONAL AIR SUPPORT")
-                st.divider()
+                # Using an all-black aesthetic and rendering the link rings in Brinc Blue
                 st.markdown(f"""
-                <div style="background: #000000; border: 1px solid #333; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                    <h6 style="color: #ffffff; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
-                    <h2 style="color: #ffffff; margin: 0; font-family: 'IBM Plex Mono', monospace;">${heli_cost:.2f}</h2>
-                    <div style="color: #797979; font-size: 0.65rem; margin-top: 5px;">BASED ON $850/HR OP COST</div>
+                <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
+                    <div style="display: inline-block; border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 50%; padding: 4px;">
+                        <div style="border: 2px solid rgba(0, 210, 255, 0.6); border-radius: 50%; padding: 6px;">
+                            <div style="border: 2px solid #00D2FF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
+                                <span style="color: #00D2FF; font-weight: bold; font-family: sans-serif; font-size: 16px;">🔗</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
-                <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; background: #050505; font-family: 'Manrope', sans-serif;">
-                    <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
-                    <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
-                    <div style="color: #797979; font-size: 0.85rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
+                <hr style="border-color: #333; margin-bottom: 20px;">
+                
+                <div style="background: #000000; border: 1px solid #222; padding: 20px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                    <h6 style="color: #ffffff; margin: 0; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
+                    <h2 style="color: #ffffff; margin: 15px 0; font-family: 'IBM Plex Mono', monospace; font-size: 2.5rem;">${heli_cost:.2f}</h2>
+                    <div style="color: #797979; font-size: 0.7rem;">BASED ON $850/HR OP COST</div>
+                </div>
+                
+                <div style="border: 1px solid #222; padding: 15px; border-radius: 4px; background: #000000; font-family: 'Manrope', sans-serif;">
+                    <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
+                    <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
+                    <div style="color: #797979; font-size: 0.9rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -334,11 +352,12 @@ with left_col:
         """
         folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
         
-        rings = [(2, '#00D2FF'), (4, '#ffffff'), (6, '#797979'), (8, '#444444')]
-        for r, c in rings:
-            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color=c, weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
+        # All rings set to Brinc Blue
+        rings = [2, 4, 6, 8]
+        for r in rings:
+            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color='#00D2FF', weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
             lat_offset = (r / 69.0)
-            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:{c}; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
+            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:#00D2FF; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
 
         is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
 
