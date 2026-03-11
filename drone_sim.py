@@ -544,12 +544,15 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
+            # --- Dynamic Stopwatch Logic ---
             if is_rtb_complete:
                 t_min = int(d['turnaround_min'])
                 t_sec = int((d['turnaround_min'] * 60) % 60)
-                ui['metric_eta'].metric("TURNAROUND", f"{t_min}m {t_sec}s")
+                ui['metric_eta'].metric("RECHARGE TIME", f"{t_min:02d}m {t_sec:02d}s")
             else:
-                ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
+                # Stopwatch counts up to the total outbound time, then stops
+                display_time = min(curr_time, d['t_out'])
+                ui['metric_eta'].metric("TIME TO TGT", f"{int(display_time/60):02d}:{int(display_time%60):02d}")
             
             adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
