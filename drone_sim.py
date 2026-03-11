@@ -134,7 +134,7 @@ def load_data():
         df.columns = df.columns.str.strip()
         return df
     except:
-        # Fallback dictionary with updated Cruise Speeds
+        # Fallback dictionary
         data = {
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
             'flight_time_min': [42, 60, 40, 54],
@@ -142,6 +142,19 @@ def load_data():
             'range_miles': [5.0, 12.0, 7.5, 6.2]
         }
         return pd.DataFrame(data)
+
+def get_full_recharge_time(model_name):
+    # Returns full 0-100% charge time in minutes
+    mapping = {
+        'RESPONDER': 25,
+        'GUARDIAN': 1, # 60 seconds battery swap
+        'SKYDIO': 90,
+        'MATRICE': 55
+    }
+    for key, val in mapping.items():
+        if key in model_name.upper():
+            return val
+    return 60
 
 def get_lat_lon_from_zip(zip_code):
     geolocator = Nominatim(user_agent="drone_sim_performance_final")
@@ -214,7 +227,7 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
 left_col, mid_col = st.columns([7, 3])
 
 # ==========================================
-# COLUMN 2: OPS CENTER
+# COLUMN 2: OPS CENTER & ASSET COST
 # ==========================================
 with mid_col:
     # Top Actions Area
@@ -225,6 +238,31 @@ with mid_col:
             st.session_state.has_run_once = False 
             st.session_state.step = 2
             st.rerun()
+
+        # Helicopter Cost Comparison
+        if st.session_state.target and st.session_state.base:
+            dist = get_distance_miles(st.session_state.base, st.session_state.target)
+            
+            # Estimate Helicopter Metrics: 120 mph speed, 15 min hover, $850/hr cost
+            heli_time_hr = ((dist * 2) / 120.0) + 0.25 
+            heli_cost = heli_time_hr * 850 
+            
+            with st.popover("🚁 VIEW AIR ASSET COST", use_container_width=True):
+                st.markdown("### TRADITIONAL AIR SUPPORT")
+                st.divider()
+                st.markdown(f"""
+                <div style="background: rgba(255, 75, 75, 0.05); border: 1px solid #FF4B4B; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(255, 75, 75, 0.1);">
+                    <h6 style="color: #FF4B4B; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
+                    <h2 style="color: #FF4B4B; margin: 0; font-family: 'IBM Plex Mono', monospace;">${heli_cost:.2f}</h2>
+                    <div style="color: #797979; font-size: 0.65rem; margin-top: 5px;">BASED ON $850/HR OP COST</div>
+                </div>
+                
+                <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; background: #050505; font-family: 'Manrope', sans-serif;">
+                    <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
+                    <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
+                    <div style="color: #797979; font-size: 0.85rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">{heli_time_hr * 60:.0f} MIN</span></div>
+                </div>
+                """, unsafe_allow_html=True)
 
     st.markdown("### 🚁 OPS CENTER")
     
@@ -289,7 +327,6 @@ with left_col:
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
 
     if st.session_state.base:
-        # Changed Base icon to Custom DivIcon (Brinc Blue)
         base_html = """
         <div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;">
             <i class="fa fa-home"></i>
@@ -307,10 +344,8 @@ with left_col:
 
         for sq in st.session_state.squad_cars:
             if is_responding:
-                # Active responding car turns Red, remaining idle cars stay Brinc Blue
                 car_color = "#FF0000" if sq == best_officer_sq else "#00D2FF"
             else:
-                # All idle cars start Brinc Blue
                 car_color = "#00D2FF"
 
             car_html = f"""
@@ -321,7 +356,6 @@ with left_col:
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
-        # Changed Target icon to Custom DivIcon (Red)
         target_html = """
         <div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;">
             <i class="fa fa-crosshairs"></i>
@@ -332,7 +366,6 @@ with left_col:
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
         if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
-            # Responding Car Path is also Red
             plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
@@ -369,10 +402,23 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
         possible = hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
+        # Calculate proportional recharge time based on usage
+        used_batt_sec = (t_out * 2) + (hover_sec if possible else 0)
+        batt_used_pct = used_batt_sec / batt_sec
+        full_recharge_min = get_full_recharge_time(specs['model'])
+        
+        if specs['model'].upper() == 'GUARDIAN':
+            # Guardian is always exactly 1 min due to physical battery swap
+            turnaround_min = 1.0 
+        else:
+            # Others recharge proportionally based on battery drained
+            turnaround_min = full_recharge_min * batt_used_pct
+
         fleet_sim_data.append({
             'ui': drone, 't_out': t_out, 't_hov': hover_sec if possible else 0,
             't_total': (t_out * 2) + (hover_sec if possible else 0),
             'batt_cap': batt_sec, 'possible': possible,
+            'turnaround_min': turnaround_min,
             'fail_msg': "FUEL" if hover_sec < 0 else "RANGE"
         })
 
@@ -433,6 +479,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             
             phase_txt, phase_col, site_time = "", "#00D2FF", 0
             is_active = False
+            is_rtb_complete = False
             
             if curr_time < d['t_out']:
                 phase_txt = ">> OUTBOUND"
@@ -447,9 +494,17 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
                 is_active = True
             else:
-                phase_txt, phase_col, site_time = "✓ AT STATION", d.get('perf_color', '#ffffff'), d['t_hov']
+                # TURNAROUND LOGIC TRIGGERED HERE
+                if ui['specs']['model'].upper() == 'GUARDIAN':
+                    phase_txt = "🔄 SWAPPING BATT"
+                else:
+                    phase_txt = "⚡ RECHARGING"
+                
+                phase_col = "#FFC300" # Yellow to indicate charging
+                site_time = d['t_hov']
                 flight_prog = 0.0
                 is_active = False
+                is_rtb_complete = True
 
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
@@ -457,7 +512,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
+            # Swap Metric from "TIME TO TGT" to "TURNAROUND" when RTB is complete
+            if is_rtb_complete:
+                t_min = int(d['turnaround_min'])
+                t_sec = int((d['turnaround_min'] * 60) % 60)
+                ui['metric_eta'].metric("TURNAROUND", f"{t_min}m {t_sec}s")
+            else:
+                ui['metric_eta'].metric("TIME TO TGT", f"{int(d['t_out']/60):02d}:{int(d['t_out']%60):02d}")
             
             adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
             ui['metric_adv'].metric("ADVANTAGE", adv_str)
