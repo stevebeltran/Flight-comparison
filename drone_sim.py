@@ -243,24 +243,24 @@ with mid_col:
         if st.session_state.target and st.session_state.base:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             
-            # Estimate Helicopter Metrics: 120 mph speed, 15 min hover, $850/hr cost
-            heli_time_hr = ((dist * 2) / 120.0) + 0.25 
+            # Estimate Helicopter Metrics: locked to Guardian's 60 min flight time
+            heli_time_hr = 1.0  # 60 minutes
             heli_cost = heli_time_hr * 850 
             
             with st.popover("🚁 VIEW AIR ASSET COST", use_container_width=True):
                 st.markdown("### TRADITIONAL AIR SUPPORT")
                 st.divider()
                 st.markdown(f"""
-                <div style="background: rgba(255, 75, 75, 0.05); border: 1px solid #FF4B4B; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(255, 75, 75, 0.1);">
-                    <h6 style="color: #FF4B4B; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
-                    <h2 style="color: #FF4B4B; margin: 0; font-family: 'IBM Plex Mono', monospace;">${heli_cost:.2f}</h2>
+                <div style="background: #000000; border: 1px solid #333; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                    <h6 style="color: #ffffff; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
+                    <h2 style="color: #ffffff; margin: 0; font-family: 'IBM Plex Mono', monospace;">${heli_cost:.2f}</h2>
                     <div style="color: #797979; font-size: 0.65rem; margin-top: 5px;">BASED ON $850/HR OP COST</div>
                 </div>
                 
                 <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; background: #050505; font-family: 'Manrope', sans-serif;">
                     <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
                     <div style="color: #797979; font-size: 0.85rem; margin-bottom: 4px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
-                    <div style="color: #797979; font-size: 0.85rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">{heli_time_hr * 60:.0f} MIN</span></div>
+                    <div style="color: #797979; font-size: 0.85rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -398,7 +398,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
         t_out = dist_one_way / (max_v / 3600)
         batt_sec = float(specs['flight_time_min']) * 60
-        hover_sec = (batt_sec * 0.80) - (t_out * 2)
+        
+        # --- NEW LOGIC: Flat 5-Minute Reserve Time ---
+        reserve_sec = 5 * 60
+        hover_sec = (batt_sec - reserve_sec) - (t_out * 2)
         
         possible = hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
@@ -494,13 +497,12 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
                 is_active = True
             else:
-                # TURNAROUND LOGIC TRIGGERED HERE
                 if ui['specs']['model'].upper() == 'GUARDIAN':
                     phase_txt = "🔄 SWAPPING BATT"
                 else:
                     phase_txt = "⚡ RECHARGING"
                 
-                phase_col = "#FFC300" # Yellow to indicate charging
+                phase_col = "#FFC300" 
                 site_time = d['t_hov']
                 flight_prog = 0.0
                 is_active = False
@@ -512,7 +514,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # Swap Metric from "TIME TO TGT" to "TURNAROUND" when RTB is complete
             if is_rtb_complete:
                 t_min = int(d['turnaround_min'])
                 t_sec = int((d['turnaround_min'] * 60) % 60)
