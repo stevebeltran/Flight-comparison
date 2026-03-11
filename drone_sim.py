@@ -68,20 +68,31 @@ st.markdown("""
 
     /* Button and Popover Styling */
     div.stButton > button, div[data-testid="stPopover"] > button {
-        background-color: #111;
-        color: #ffffff;
-        border: 1px solid #444;
+        background-color: #111 !important;
+        color: #ffffff !important;
+        border: 1px solid #444 !important;
         font-size: 0.8rem;
         font-family: 'Manrope', sans-serif;
     }
+    
+    /* Hover state */
     div.stButton > button:hover, div[data-testid="stPopover"] > button:hover {
-        border-color: #00D2FF;
-        color: #00D2FF;
+        border-color: #00D2FF !important;
+        color: #00D2FF !important;
+    }
+    
+    /* Active, Focus, and Opened states for buttons to prevent turning white */
+    div.stButton > button:focus, div.stButton > button:active,
+    div[data-testid="stPopover"] > button:focus, div[data-testid="stPopover"] > button:active,
+    div[data-testid="stPopover"] > button[aria-expanded="true"] {
+        background-color: #111 !important;
+        color: #00D2FF !important;
+        border-color: #00D2FF !important;
     }
 
-    /* Force Popover Body to be Black */
-    div[data-testid="stPopoverBody"] {
-        background-color: #0a0a0a !important;
+    /* Force Popover Body to be strictly Black */
+    div[data-testid="stPopoverBody"], div[role="dialog"] {
+        background-color: #050505 !important;
         border: 1px solid #333 !important;
     }
     
