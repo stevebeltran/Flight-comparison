@@ -214,53 +214,17 @@ if st.session_state.base and st.session_state.target and st.session_state.squad_
 left_col, mid_col = st.columns([7, 3])
 
 # ==========================================
-# COLUMN 2: OPS CENTER & BUDGET BUTTON
+# COLUMN 2: OPS CENTER
 # ==========================================
 with mid_col:
     # Top Actions Area
     if st.session_state.has_run_once:
-        with st.popover("💰 VIEW BUDGET IMPACT", use_container_width=True):
-            st.markdown("### BUDGET IMPACT")
-            st.divider()
-            
-            calls_per_day = st.slider("ESTIMATED DAILY CALLS", min_value=1, max_value=100, value=20)
-            cost_officer = 82
-            cost_drone = 6
-            savings_per_call = cost_officer - cost_drone
-            
-            st.markdown(f"""
-            <div style="background: rgba(0, 210, 255, 0.05); border: 1px solid #00D2FF; padding: 15px; border-radius: 4px; text-align: center; margin-bottom: 15px; box-shadow: 0px 0px 10px rgba(0, 212, 255, 0.1);">
-                <h6 style="color: #00D2FF; margin: 0; font-size: 0.8rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">ANNUAL TAXPAYER SAVINGS</h6>
-                <h2 style="color: #00D2FF; margin: 0; font-family: 'IBM Plex Mono', monospace;">$554,800</h2>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            be_resp = 80000 / (savings_per_call * calls_per_day * 30.4)
-            st.markdown(f"""
-            <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
-                <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">RESPONDER</h5>
-                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">5 MI RADIUS</span></div>
-                <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$80,000</span></div>
-                <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_resp:.1f} MONTHS</span></div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            be_guard = 160000 / (savings_per_call * calls_per_day * 30.4)
-            st.markdown(f"""
-            <div style="border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #050505; font-family: 'Manrope', sans-serif;">
-                <h5 style="color: #ffffff; margin: 0; margin-bottom: 4px;">GUARDIAN</h5>
-                <div style="color: #797979; font-size: 0.85rem;">COVERAGE: <span style="color:#ffffff;">12 MI RADIUS</span></div>
-                <div style="color: #797979; font-size: 0.85rem;">UNIT CAPEX: <span style="color:#ffffff;">$160,000</span></div>
-                <div style="color: #797979; font-size: 0.85rem;">BREAK-EVEN: <span style="color:#00D2FF; font-weight:bold;">{be_guard:.1f} MONTHS</span></div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            if st.button("🔄 RESET SCENARIO", use_container_width=True):
-                st.session_state.target = None
-                st.session_state.sim_completed = False
-                st.session_state.has_run_once = False 
-                st.session_state.step = 2
-                st.rerun()
+        if st.button("🔄 RESET SCENARIO", use_container_width=True):
+            st.session_state.target = None
+            st.session_state.sim_completed = False
+            st.session_state.has_run_once = False 
+            st.session_state.step = 2
+            st.rerun()
 
     st.markdown("### 🚁 OPS CENTER")
     
