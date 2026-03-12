@@ -17,7 +17,7 @@ st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_s
 # --- Session State Initialization ---
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
-if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 13
+if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 4 # Changed to 4 to pan out over the US
 if 'base' not in st.session_state: st.session_state.base = None
 if 'target' not in st.session_state: st.session_state.target = None
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
@@ -174,12 +174,17 @@ def get_full_recharge_time(model_name):
             return val
     return 60
 
+# --- CACHED GEOCODER FUNCTION ---
+@st.cache_data(show_spinner=False)
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="drone_sim_performance_final")
+    geolocator = Nominatim(user_agent="tactical_drone_command_ui_v2")
     try:
-        location = geolocator.geocode(f"{zip_code}, USA")
+        # Pass a structured dictionary instead of a raw string
+        location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
         if location: return [location.latitude, location.longitude]
-    except: return None
+    except Exception as e:
+        print(f"Geocode Error: {e}")
+        return None
     return None
 
 def get_distance_miles(p1, p2):
