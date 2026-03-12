@@ -311,6 +311,7 @@ with mid_col:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
                 st.session_state.map_center = coords
+                st.session_state.map_zoom = 13  # <--- ZOOM FIX ADDED HERE
                 st.session_state.step = 2
                 st.rerun()
             else:
