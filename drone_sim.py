@@ -90,10 +90,15 @@ st.markdown("""
         border-color: #00D2FF !important;
     }
 
-    /* Force Popover Body to be strictly Black */
-    div[data-testid="stPopoverBody"], div[role="dialog"] {
+    /* Aggressively Force Popover Body to be strictly Black */
+    div[data-testid="stPopoverBody"], 
+    div[data-testid="stPopover"] > div,
+    div[role="dialog"],
+    div[role="dialog"] > div,
+    .stPopoverBody {
         background-color: #050505 !important;
-        border: 1px solid #333 !important;
+        background: #050505 !important;
+        border-color: #333 !important;
     }
     
     /* Input Styling */
