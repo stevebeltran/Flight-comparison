@@ -51,7 +51,7 @@ st.markdown("""
     h3 { font-size: 1.2rem !important; }
     
     .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
-    div.stVerticalBlock > div { gap: 0.5rem !important; }
+    div.stVerticalBlock > div { gap: 0.2rem !important; } /* TIGHTENED GLOBAL GAP */
     
     /* Metrics */
     div[data-testid="stMetricValue"] {
@@ -113,24 +113,25 @@ st.markdown("""
     /* --- DRONE NAME PULSE (BRINC BLUE) --- */
     @keyframes dronePulse {
         0%, 49% { color: #797979; text-shadow: none; }
-        50%, 100% { color: #00D2FF; text-shadow: 0 0 10px #00D2FF; }
+        50%, 100% { color: #00D2FF; text-shadow: 0 0 8px #00D2FF; }
     }
-    .drone-active { animation: dronePulse 0.8s infinite; font-weight: bold; font-family: 'IBM Plex Mono', monospace; }
-    .drone-static { color: #ffffff; font-weight: bold; text-shadow: none; font-family: 'IBM Plex Mono', monospace; }
+    /* ADDED NEGATIVE MARGIN TO PULL PROGRESS BAR UP */
+    .drone-active { animation: dronePulse 0.8s infinite; font-weight: bold; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; display: block; margin-bottom: -10px; }
+    .drone-static { color: #ffffff; font-weight: bold; text-shadow: none; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; display: block; margin-bottom: -10px; }
 
     /* --- INCIDENT LOG CSS --- */
     .incident-log {
         background-color: #111;
         border: 1px solid #333;
         border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 15px;
+        padding: 8px; /* Tighter padding */
+        margin-bottom: 8px;
         font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.85rem;
-        min-height: 125px; 
+        font-size: 0.8rem;
+        min-height: 80px;  /* Squished height */
     }
-    .log-header { color: #ffffff; font-size: 0.9rem; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 4px; font-weight: bold; }
-    .log-entry { margin-bottom: 4px; color: #797979; }
+    .log-header { color: #ffffff; font-size: 0.85rem; border-bottom: 1px solid #333; margin-bottom: 6px; padding-bottom: 4px; font-weight: bold; }
+    .log-entry { margin-bottom: 2px; color: #797979; }
     .log-time { color: #797979; margin-right: 12px; }
     
     /* Muted Log Colors */
@@ -143,34 +144,34 @@ st.markdown("""
     .drone-card {
         background-color: #080808;
         border: 1px solid #222;
-        border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
-        margin-bottom: 5px;
+        border-radius: 4px;
+        padding: 6px 10px; /* Tighter padding */
+        margin-top: 2px;
+        margin-bottom: 0px;
     }
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
+        gap: 6px; /* Tighter gap */
     }
     .m-box { display: flex; flex-direction: column; }
     .m-label {
         color: #797979;
-        font-size: 0.65rem;
+        font-size: 0.55rem; /* Smaller font */
         font-family: 'Manrope', sans-serif;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 2px;
+        margin-bottom: 0px; /* Removed margin */
     }
     .m-val {
         color: #00D2FF;
-        font-size: 1.1rem;
+        font-size: 0.95rem; /* Smaller font */
         font-family: 'IBM Plex Mono', monospace;
         font-weight: bold;
     }
     .m-val-dim {
         color: #444444;
-        font-size: 1.1rem;
+        font-size: 0.95rem; /* Smaller font */
         font-family: 'IBM Plex Mono', monospace;
     }
     </style>
@@ -283,7 +284,6 @@ left_col, mid_col = st.columns([7, 3])
 # COLUMN 2: OPS CENTER & ASSET COST
 # ==========================================
 with mid_col:
-    # --- STEP 1: ONLY SHOW OPS CENTER AND ZIP HERE ---
     if st.session_state.step == 1:
         st.markdown("### OPS CENTER")
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
@@ -302,7 +302,6 @@ with mid_col:
             else:
                 st.error("Invalid ZIP code. (Try again)")
 
-    # --- STEP 2+: SHOW LOGO AND COMPACT AIR ASSET TOGGLE ---
     elif st.session_state.step >= 2:
         asset_col, space_col, logo_col = st.columns([1.5, 0.5, 2])
         with logo_col:
@@ -337,7 +336,8 @@ with mid_col:
                     </div>
                     """, unsafe_allow_html=True)
                     
-        st.divider()
+        # REPLACED st.divider() with tiny custom invisible spacer
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
         if not st.session_state.base:
             st.warning("SET BASE")
@@ -367,7 +367,9 @@ with mid_col:
                         'metrics_html': metrics_placeholder 
                     }
                     drone_ui_elements.append(ui_obj)
-                    st.divider()
+                    
+                    # REPLACED st.divider() with tiny custom spacer
+                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
 # COLUMN 1: MAP
@@ -393,7 +395,6 @@ with left_col:
 
         for sq in st.session_state.squad_cars:
             if is_responding:
-                # Color the responding car red based on the locked state
                 car_color = "#FF0000" if sq == st.session_state.best_officer_sq else "#00D2FF"
             else:
                 car_color = "#00D2FF"
@@ -432,7 +433,6 @@ with left_col:
             st.session_state.target = coords
             randomize_squads() 
             generate_incident() 
-            # Lock in the responding officer the moment the map is clicked
             calculate_responding_officer() 
             st.session_state.step = 3
             st.session_state.sim_completed = False
@@ -479,7 +479,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     
     fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
-    
+
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
     def render_ui_state(curr_time, log_html_override=None):
@@ -510,7 +510,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
-                ui['status_text'].markdown(f"<span style='color:#797979; font-weight:bold;'>{d['fail_msg']}</span>", unsafe_allow_html=True)
+                # Added wrapper div to apply negative margin and compress height
+                ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:#797979; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{d['fail_msg']}</span></div>", unsafe_allow_html=True)
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
                 ui['flight_bar'].progress(0.0)
                 
@@ -556,11 +557,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
-
-            ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
+            # Added wrapper div to apply negative margin and compress height
+            ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:{phase_col}; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span></div>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # --- Dynamic Metric Card Logic ---
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             
             eta_label = "TIME TO TGT"
