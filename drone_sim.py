@@ -135,6 +135,41 @@ st.markdown("""
     .log-action { color: #00D2FF; font-weight: bold; }
     .log-success { color: #00D2FF; font-weight: bold; }
     .log-info { color: #797979; font-weight: normal; }
+
+    /* --- DRONE METRICS CARD --- */
+    .drone-card {
+        background-color: #080808;
+        border: 1px solid #222;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+        margin-bottom: 5px;
+    }
+    .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .m-box { display: flex; flex-direction: column; }
+    .m-label {
+        color: #797979;
+        font-size: 0.65rem;
+        font-family: 'Manrope', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+    }
+    .m-val {
+        color: #00D2FF;
+        font-size: 1.1rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: bold;
+    }
+    .m-val-dim {
+        color: #444444;
+        font-size: 1.1rem;
+        font-family: 'IBM Plex Mono', monospace;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -172,10 +207,8 @@ def get_full_recharge_time(model_name):
 # --- CACHED GEOCODER FUNCTION ---
 @st.cache_data(show_spinner=False)
 def get_lat_lon_from_zip(zip_code):
-    # Added a 10-second timeout to prevent it from failing on slow API responses
     geolocator = Nominatim(user_agent="tactical_drone_command_ui_v3", timeout=10)
     try:
-        # Use explicit dict for US postal code for highest reliability
         location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
         if location: 
             return [location.latitude, location.longitude]
@@ -263,12 +296,10 @@ with mid_col:
         if st.session_state.target and st.session_state.base:
             dist = get_distance_miles(st.session_state.base, st.session_state.target)
             
-            # Estimate Helicopter Metrics: locked to 60 min flight time
             heli_time_hr = 1.0  
             heli_cost = heli_time_hr * 850 
             
             with st.popover("🚁 VIEW AIR ASSET COST", use_container_width=True):
-                # Removed empty spaces and comments so Streamlit's parser doesn't break
                 st.markdown(f"""
                 <div style="background-color: #050505; padding: 10px; border-radius: 5px;">
                     <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
@@ -299,7 +330,6 @@ with mid_col:
     if st.session_state.step == 1:
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
         with zip_col:
-            # Swapped st_keyup for st.text_input. User must press Enter to trigger the search.
             zip_in = st.text_input("ZIP", placeholder="ZIP + ENTER", label_visibility="collapsed", max_chars=5, key="zip_input")
         with logo_col:
             st.image("logo.png", use_container_width=True)
@@ -308,7 +338,7 @@ with mid_col:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
                 st.session_state.map_center = coords
-                st.session_state.map_zoom = 13  # Zooms in perfectly when found
+                st.session_state.map_zoom = 13 
                 st.session_state.step = 2
                 st.rerun()
             else:
@@ -338,16 +368,15 @@ with mid_col:
                     name_placeholder.markdown(f"<span class='drone-static'>{row['model']}</span>", unsafe_allow_html=True)
                     status_placeholder = head_c2.empty()
                     
-                    m1, m2, m3, m4 = st.columns(4)
+                    flight_bar = st.progress(0)
+                    metrics_placeholder = st.empty() 
+                    
                     ui_obj = {
                         'specs': row,
                         'name_text': name_placeholder,
                         'status_text': status_placeholder,
-                        'flight_bar': st.progress(0),
-                        'metric_hover': m1.empty(), 
-                        'metric_eta': m2.empty(),   
-                        'metric_adv': m3.empty(), 
-                        'metric_batt': m4.empty(),  
+                        'flight_bar': flight_bar,
+                        'metrics_html': metrics_placeholder 
                     }
                     drone_ui_elements.append(ui_obj)
                     st.divider()
@@ -366,7 +395,6 @@ with left_col:
         """
         folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
         
-        # All rings set to Brinc Blue
         rings = [2, 4, 6, 8]
         for r in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color='#00D2FF', weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
@@ -438,16 +466,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
         possible = hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
-        # Calculate proportional recharge time based on usage
         used_batt_sec = (t_out * 2) + (hover_sec if possible else 0)
         batt_used_pct = used_batt_sec / batt_sec
         full_recharge_min = get_full_recharge_time(specs['model'])
         
         if specs['model'].upper() == 'GUARDIAN':
-            # Guardian is always exactly 1 min due to physical battery swap
             turnaround_min = 1.0 
         else:
-            # Others recharge proportionally based on battery drained
             turnaround_min = full_recharge_min * batt_used_pct
 
         fleet_sim_data.append({
@@ -508,9 +533,21 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui = d['ui']
             if not d['possible']:
                 ui['status_text'].markdown(f"<span style='color:#797979; font-weight:bold;'>{d['fail_msg']}</span>", unsafe_allow_html=True)
-                ui['metric_eta'].metric("TIME TO TGT", "N/A")
-                ui['metric_adv'].metric("ADVANTAGE", "N/A")
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
+                ui['flight_bar'].progress(0.0)
+                
+                # Render N/A Card
+                card_html = f"""
+                <div class="drone-card">
+                    <div class="metric-grid">
+                        <div class="m-box"><div class="m-label">TIME TO TGT</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val-dim">N/A</div></div>
+                    </div>
+                </div>
+                """
+                ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
                 continue
             
             phase_txt, phase_col, site_time = "", "#00D2FF", 0
@@ -543,27 +580,39 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
-
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # --- Dynamic Stopwatch Logic ---
+            # --- Dynamic Metric Card Logic ---
+            eta_label = "TIME TO TGT"
             if is_rtb_complete:
                 t_min = int(d['turnaround_min'])
                 t_sec = int((d['turnaround_min'] * 60) % 60)
-                ui['metric_eta'].metric("RECHARGE TIME", f"{t_min:02d}m {t_sec:02d}s")
+                eta_label = "RECHARGE"
+                eta_val = f"{t_min:02d}m {t_sec:02d}s"
             else:
-                # Stopwatch counts up to the total outbound time, then stops
                 display_time = min(curr_time, d['t_out'])
-                ui['metric_eta'].metric("TIME TO TGT", f"{int(display_time/60):02d}:{int(display_time%60):02d}")
+                eta_val = f"{int(display_time/60):02d}:{int(display_time%60):02d}"
             
             adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
-            ui['metric_adv'].metric("ADVANTAGE", adv_str)
-            ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
+            adv_val = adv_str
+            hov_val = f"{int(site_time/60):02d}:{int(site_time%60):02d}"
             
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
-            ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
+            bat_val = f"{int(pct)}%"
+
+            card_html = f"""
+            <div class="drone-card">
+                <div class="metric-grid">
+                    <div class="m-box"><div class="m-label">{eta_label}</div><div class="m-val">{eta_val}</div></div>
+                    <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val">{adv_val}</div></div>
+                    <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val">{hov_val}</div></div>
+                    <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val">{bat_val}</div></div>
+                </div>
+            </div>
+            """
+            ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
 
     if not st.session_state.sim_completed:
         for tick in range(101):
@@ -579,4 +628,3 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         
     else:
         render_ui_state(sim_dur)
-
