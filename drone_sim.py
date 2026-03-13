@@ -23,6 +23,9 @@ if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 if 'sim_completed' not in st.session_state: st.session_state.sim_completed = False
 if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
+# Added state locks for the responding officer so metrics don't jump when cars shuffle
+if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
+if 't_officers' not in st.session_state: st.session_state.t_officers = None
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -135,6 +138,41 @@ st.markdown("""
     .log-action { color: #00D2FF; font-weight: bold; }
     .log-success { color: #00D2FF; font-weight: bold; }
     .log-info { color: #797979; font-weight: normal; }
+
+    /* --- DRONE METRICS CARD --- */
+    .drone-card {
+        background-color: #080808;
+        border: 1px solid #222;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+        margin-bottom: 5px;
+    }
+    .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .m-box { display: flex; flex-direction: column; }
+    .m-label {
+        color: #797979;
+        font-size: 0.65rem;
+        font-family: 'Manrope', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+    }
+    .m-val {
+        color: #00D2FF;
+        font-size: 1.1rem;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: bold;
+    }
+    .m-val-dim {
+        color: #444444;
+        font-size: 1.1rem;
+        font-family: 'IBM Plex Mono', monospace;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -157,7 +195,6 @@ def load_data():
         return pd.DataFrame(data)
 
 def get_full_recharge_time(model_name):
-    # Returns full 0-100% charge time in minutes
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, # 60 seconds battery swap
@@ -169,13 +206,10 @@ def get_full_recharge_time(model_name):
             return val
     return 60
 
-# --- CACHED GEOCODER FUNCTION ---
 @st.cache_data(show_spinner=False)
 def get_lat_lon_from_zip(zip_code):
-    # Added a 10-second timeout to prevent it from failing on slow API responses
     geolocator = Nominatim(user_agent="tactical_drone_command_ui_v3", timeout=10)
     try:
-        # Use explicit dict for US postal code for highest reliability
         location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
         if location: 
             return [location.latitude, location.longitude]
@@ -208,7 +242,6 @@ def generate_incident():
     base_time = datetime.now().replace(hour=hr, minute=mn, second=sc)
     st.session_state.t_call = base_time
     st.session_state.t_launch = base_time + timedelta(seconds=random.randint(45, 120))
-    if 't_officers' in st.session_state: del st.session_state['t_officers']
 
 def randomize_squads():
     if st.session_state.base:
@@ -221,27 +254,27 @@ def randomize_squads():
             d_lon = (r_mi * math.cos(angle)) / (69.172 * math.cos(math.radians(st.session_state.base[0])))
             st.session_state.squad_cars.append([st.session_state.base[0] + d_lat, st.session_state.base[1] + d_lon])
 
-# --- Pre-Calculate Officer Logic ---
-best_officer_dist = float('inf')
-best_officer_sq = None
-officer_travel_sec = 0
-t_officer_dispatch = None
+def calculate_responding_officer():
+    """Calculates closest squad car and locks the ETA into session state."""
+    best_dist = float('inf')
+    best_sq = None
+    if st.session_state.base and st.session_state.target and st.session_state.squad_cars:
+        for sq in st.session_state.squad_cars:
+            d = get_distance_miles(sq, st.session_state.target)
+            if d < best_dist:
+                best_dist = d
+                best_sq = sq
+        
+        if best_dist == float('inf'): 
+            best_dist = get_distance_miles(st.session_state.base, st.session_state.target)
+            best_sq = st.session_state.base
 
-if st.session_state.base and st.session_state.target and st.session_state.squad_cars:
-    for sq in st.session_state.squad_cars:
-        d = get_distance_miles(sq, st.session_state.target)
-        if d < best_officer_dist:
-            best_officer_dist = d
-            best_officer_sq = sq
-    
-    if best_officer_dist == float('inf'): 
-        best_officer_dist = get_distance_miles(st.session_state.base, st.session_state.target)
-        best_officer_sq = st.session_state.base
-
-    if 't_call' in st.session_state:
-        t_officer_dispatch = st.session_state.t_call + timedelta(seconds=60)
-        officer_travel_sec = (best_officer_dist * 1.4) / (35.0 / 3600.0)
-        st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
+        st.session_state.best_officer_sq = best_sq
+        
+        if 't_call' in st.session_state:
+            t_officer_dispatch = st.session_state.t_call + timedelta(seconds=60)
+            officer_travel_sec = (best_dist * 1.4) / (35.0 / 3600.0)
+            st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
 # --- Layout: Dynamic Columns ---
 left_col, mid_col = st.columns([7, 3])
@@ -325,18 +358,15 @@ with mid_col:
                     name_placeholder.markdown(f"<span class='drone-static'>{row['model']}</span>", unsafe_allow_html=True)
                     status_placeholder = head_c2.empty()
                     
-                    # Expanded to 5 columns to fit all metrics without overwriting
-                    m1, m2, m3, m4, m5 = st.columns(5)
+                    flight_bar = st.progress(0)
+                    metrics_placeholder = st.empty() 
+                    
                     ui_obj = {
                         'specs': row,
                         'name_text': name_placeholder,
                         'status_text': status_placeholder,
-                        'flight_bar': st.progress(0),
-                        'metric_eta': m1.empty(),   
-                        'metric_adv': m2.empty(), 
-                        'metric_hover': m3.empty(), 
-                        'metric_batt': m4.empty(),
-                        'metric_rechg': m5.empty(), # Dedicated Recharge metric
+                        'flight_bar': flight_bar,
+                        'metrics_html': metrics_placeholder 
                     }
                     drone_ui_elements.append(ui_obj)
                     st.divider()
@@ -365,7 +395,8 @@ with left_col:
 
         for sq in st.session_state.squad_cars:
             if is_responding:
-                car_color = "#FF0000" if sq == best_officer_sq else "#00D2FF"
+                # Color the responding car red based on the locked state
+                car_color = "#FF0000" if sq == st.session_state.best_officer_sq else "#00D2FF"
             else:
                 car_color = "#00D2FF"
 
@@ -386,8 +417,8 @@ with left_col:
         
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
-        if st.session_state.step == 3 and not st.session_state.sim_completed and best_officer_sq:
-            plugins.AntPath(locations=[best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
+        if st.session_state.step == 3 and not st.session_state.sim_completed and st.session_state.best_officer_sq:
+            plugins.AntPath(locations=[st.session_state.best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     map_data = st_folium(m, height=850, use_container_width=True, key="map")
 
@@ -401,8 +432,9 @@ with left_col:
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
-            randomize_squads() # <--- SQUADS ONLY SHUFFLE WHEN YOU CLICK A NEW TARGET NOW
             generate_incident() 
+            # Lock in the responding officer the moment the map is clicked
+            calculate_responding_officer() 
             st.session_state.step = 3
             st.session_state.sim_completed = False
             st.rerun()
@@ -452,6 +484,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     for d in fleet_sim_data:
         if d['possible']:
             drone_arrive_dt = st.session_state.t_launch + timedelta(seconds=d['t_out'])
+            # Uses the locked officer time instead of recalculating
             adv_sec = (st.session_state.t_officers - drone_arrive_dt).total_seconds()
             d['adv_min'] = adv_sec / 60.0
         else:
@@ -493,12 +526,20 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui = d['ui']
             if not d['possible']:
                 ui['status_text'].markdown(f"<span style='color:#797979; font-weight:bold;'>{d['fail_msg']}</span>", unsafe_allow_html=True)
-                ui['metric_eta'].metric("TGT ETA", "N/A")
-                ui['metric_adv'].metric("ADV", "N/A")
-                ui['metric_hover'].metric("ON SCENE", "N/A")
-                ui['metric_batt'].metric("BATT", "N/A")
-                ui['metric_rechg'].metric("RECHARGE", "N/A")
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
+                ui['flight_bar'].progress(0.0)
+                
+                card_html = f"""
+                <div class="drone-card">
+                    <div class="metric-grid">
+                        <div class="m-box"><div class="m-label">TIME TO TGT</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val-dim">N/A</div></div>
+                        <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val-dim">N/A</div></div>
+                    </div>
+                </div>
+                """
+                ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
                 continue
             
             phase_txt, phase_col, site_time = "", "#00D2FF", 0
@@ -535,26 +576,36 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # --- Dedicated Metric Columns ---
-            display_time = min(curr_time, d['t_out'])
-            ui['metric_eta'].metric("TGT ETA", f"{int(display_time/60):02d}:{int(display_time%60):02d}")
+            # --- Dynamic Metric Card Logic ---
+            eta_label = "TIME TO TGT"
+            if is_rtb_complete:
+                t_min = int(d['turnaround_min'])
+                t_sec = int((d['turnaround_min'] * 60) % 60)
+                eta_label = "<span style='color: #ffffff;'>RECHARGE</span>"
+                eta_val = f"{t_min:02d}m {t_sec:02d}s"
+            else:
+                display_time = min(curr_time, d['t_out'])
+                eta_val = f"{int(display_time/60):02d}:{int(display_time%60):02d}"
             
-            adv_str = f"+{d['adv_min']:.1f} M" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} M"
-            ui['metric_adv'].metric("ADV", adv_str)
-            
-            ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
+            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
+            adv_val = adv_str
+            hov_val = f"{int(site_time/60):02d}:{int(site_time%60):02d}"
             
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
-            ui['metric_batt'].metric("BATT", f"{int(pct)}%")
-            
-            # --- Dynamic Recharge Climb ---
-            mission_progress = used / d['t_total'] if d['t_total'] > 0 else 0
-            current_recharge_min = d['turnaround_min'] * mission_progress
-            
-            t_min = int(current_recharge_min)
-            t_sec = int((current_recharge_min * 60) % 60)
-            ui['metric_rechg'].metric("RECHARGE", f"{t_min:02d}:{t_sec:02d}")
+            bat_val = f"{int(pct)}%"
+
+            card_html = f"""
+            <div class="drone-card">
+                <div class="metric-grid">
+                    <div class="m-box"><div class="m-label">{eta_label}</div><div class="m-val">{eta_val}</div></div>
+                    <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val">{adv_val}</div></div>
+                    <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val">{hov_val}</div></div>
+                    <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val">{bat_val}</div></div>
+                </div>
+            </div>
+            """
+            ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
 
     if not st.session_state.sim_completed:
         for tick in range(101):
@@ -565,7 +616,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
-        # ---> REMOVED randomize_squads() FROM HERE <---
+        
+        # We can now safely shuffle the cars here! 
+        # The metrics won't change because they read from the locked state.
+        randomize_squads() 
         st.rerun()
         
     else:
