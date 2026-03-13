@@ -250,59 +250,11 @@ left_col, mid_col = st.columns([7, 3])
 # COLUMN 2: OPS CENTER & ASSET COST
 # ==========================================
 with mid_col:
-    # Top Actions Area
-    if st.session_state.has_run_once:
-        if st.button("🔄 RESET SCENARIO", use_container_width=True):
-            st.session_state.target = None
-            st.session_state.sim_completed = False
-            st.session_state.has_run_once = False 
-            st.session_state.step = 2
-            st.rerun()
-
-        # Helicopter Cost Comparison
-        if st.session_state.target and st.session_state.base:
-            dist = get_distance_miles(st.session_state.base, st.session_state.target)
-            
-            # Estimate Helicopter Metrics: locked to 60 min flight time
-            heli_time_hr = 1.0  
-            heli_cost = heli_time_hr * 850 
-            
-            with st.popover("🚁 VIEW AIR ASSET COST", use_container_width=True):
-                # Wrapped everything in a master div with a black background
-                st.markdown(f"""
-                <div style="background-color: #050505; padding: 10px; border-radius: 5px;">
-                    <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
-                        <div style="display: inline-block; border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 50%; padding: 4px;">
-                            <div style="border: 2px solid rgba(0, 210, 255, 0.6); border-radius: 50%; padding: 6px;">
-                                <div style="border: 2px solid #00D2FF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
-                                    <span style="color: #00D2FF; font-weight: bold; font-family: sans-serif; font-size: 16px;">🔗</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <hr style="border-color: #333; margin-bottom: 20px;">
-                    
-                    <div style="background-color: #000000; border: 1px solid #222; padding: 20px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
-                        <h6 style="color: #ffffff; margin: 0; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
-                        <h2 style="color: #00D2FF; margin: 15px 0; font-family: 'IBM Plex Mono', monospace; font-size: 2.5rem;">${heli_cost:.2f}</h2>
-                        <div style="color: #797979; font-size: 0.7rem;">BASED ON $850/HR OP COST</div>
-                    </div>
-                    
-                    <div style="border: 1px solid #222; padding: 15px; border-radius: 4px; background-color: #000000; font-family: 'Manrope', sans-serif;">
-                        <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
-                        <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
-                        <div style="color: #797979; font-size: 0.9rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    st.markdown("### 🚁 OPS CENTER")
-    
+    # --- STEP 1: ONLY SHOW OPS CENTER AND ZIP HERE ---
     if st.session_state.step == 1:
+        st.markdown("### 🚁 OPS CENTER")
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
         with zip_col:
-            # Swapped st_keyup for st.text_input. User must press Enter to trigger the search.
             zip_in = st.text_input("ZIP", placeholder="ZIP + ENTER", label_visibility="collapsed", max_chars=5, key="zip_input")
         with logo_col:
             st.image("logo.png", use_container_width=True)
@@ -311,17 +263,49 @@ with mid_col:
             coords = get_lat_lon_from_zip(zip_in)
             if coords:
                 st.session_state.map_center = coords
-                st.session_state.map_zoom = 13  # Zooms in perfectly when found
+                st.session_state.map_zoom = 13 
                 st.session_state.step = 2
                 st.rerun()
             else:
                 st.error("Invalid ZIP code. (Try again)")
 
+    # --- STEP 2+: SHOW LOGO AND COMPACT AIR ASSET TOGGLE ---
     elif st.session_state.step >= 2:
-        _col1, _col2, logo_col = st.columns([1, 1, 2])
+        asset_col, space_col, logo_col = st.columns([1.5, 0.5, 2])
         with logo_col:
             st.image("logo.png", use_container_width=True)
-        
+            
+        with asset_col:
+            if st.session_state.target and st.session_state.base:
+                dist = get_distance_miles(st.session_state.base, st.session_state.target)
+                heli_cost = 1.0 * 850 
+                
+                with st.popover("🚁 AIR ASSET", use_container_width=True):
+                    st.markdown(f"""
+                    <div style="background-color: #050505; padding: 10px; border-radius: 5px;">
+                        <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
+                            <div style="display: inline-block; border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 50%; padding: 4px;">
+                                <div style="border: 2px solid rgba(0, 210, 255, 0.6); border-radius: 50%; padding: 6px;">
+                                    <div style="border: 2px solid #00D2FF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
+                                        <span style="color: #00D2FF; font-weight: bold; font-family: sans-serif; font-size: 16px;">🔗</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr style="border-color: #333; margin-bottom: 20px;">
+                        <div style="background-color: #000000; border: 1px solid #222; padding: 20px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
+                            <h6 style="color: #ffffff; margin: 0; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
+                            <h2 style="color: #00D2FF; margin: 15px 0; font-family: 'IBM Plex Mono', monospace; font-size: 2.5rem;">${heli_cost:.2f}</h2>
+                            <div style="color: #797979; font-size: 0.7rem;">BASED ON $850/HR OP COST</div>
+                        </div>
+                        <div style="border: 1px solid #222; padding: 15px; border-radius: 4px; background-color: #000000; font-family: 'Manrope', sans-serif;">
+                            <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
+                            <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
+                            <div style="color: #797979; font-size: 0.9rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
         st.divider()
 
         if not st.session_state.base:
@@ -341,16 +325,18 @@ with mid_col:
                     name_placeholder.markdown(f"<span class='drone-static'>{row['model']}</span>", unsafe_allow_html=True)
                     status_placeholder = head_c2.empty()
                     
-                    m1, m2, m3, m4 = st.columns(4)
+                    # Expanded to 5 columns to fit all metrics without overwriting
+                    m1, m2, m3, m4, m5 = st.columns(5)
                     ui_obj = {
                         'specs': row,
                         'name_text': name_placeholder,
                         'status_text': status_placeholder,
                         'flight_bar': st.progress(0),
-                        'metric_hover': m1.empty(), 
-                        'metric_eta': m2.empty(),   
-                        'metric_adv': m3.empty(), 
-                        'metric_batt': m4.empty(),  
+                        'metric_eta': m1.empty(),   
+                        'metric_adv': m2.empty(), 
+                        'metric_hover': m3.empty(), 
+                        'metric_batt': m4.empty(),
+                        'metric_rechg': m5.empty(), # Dedicated Recharge metric
                     }
                     drone_ui_elements.append(ui_obj)
                     st.divider()
@@ -369,7 +355,6 @@ with left_col:
         """
         folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
         
-        # All rings set to Brinc Blue
         rings = [2, 4, 6, 8]
         for r in rings:
             folium.Circle(location=st.session_state.base, radius=r * 1609.34, color='#00D2FF', weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
@@ -435,22 +420,18 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         t_out = dist_one_way / (max_v / 3600)
         batt_sec = float(specs['flight_time_min']) * 60
         
-        # --- NEW LOGIC: Flat 5-Minute Reserve Time ---
         reserve_sec = 5 * 60
         hover_sec = (batt_sec - reserve_sec) - (t_out * 2)
         
         possible = hover_sec >= 0 and dist_one_way <= float(specs['range_miles'])
         
-        # Calculate proportional recharge time based on usage
         used_batt_sec = (t_out * 2) + (hover_sec if possible else 0)
         batt_used_pct = used_batt_sec / batt_sec
         full_recharge_min = get_full_recharge_time(specs['model'])
         
         if specs['model'].upper() == 'GUARDIAN':
-            # Guardian is always exactly 1 min due to physical battery swap
             turnaround_min = 1.0 
         else:
-            # Others recharge proportionally based on battery drained
             turnaround_min = full_recharge_min * batt_used_pct
 
         fleet_sim_data.append({
@@ -511,8 +492,11 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui = d['ui']
             if not d['possible']:
                 ui['status_text'].markdown(f"<span style='color:#797979; font-weight:bold;'>{d['fail_msg']}</span>", unsafe_allow_html=True)
-                ui['metric_eta'].metric("TIME TO TGT", "N/A")
-                ui['metric_adv'].metric("ADVANTAGE", "N/A")
+                ui['metric_eta'].metric("TGT ETA", "N/A")
+                ui['metric_adv'].metric("ADV", "N/A")
+                ui['metric_hover'].metric("ON SCENE", "N/A")
+                ui['metric_batt'].metric("BATT", "N/A")
+                ui['metric_rechg'].metric("RECHARGE", "N/A")
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
                 continue
             
@@ -550,23 +534,22 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['status_text'].markdown(f"<span style='color:{phase_col}; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
-            # --- Dynamic Stopwatch Logic ---
-            if is_rtb_complete:
-                t_min = int(d['turnaround_min'])
-                t_sec = int((d['turnaround_min'] * 60) % 60)
-                ui['metric_eta'].metric("RECHARGE TIME", f"{t_min:02d}m {t_sec:02d}s")
-            else:
-                # Stopwatch counts up to the total outbound time, then stops
-                display_time = min(curr_time, d['t_out'])
-                ui['metric_eta'].metric("TIME TO TGT", f"{int(display_time/60):02d}:{int(display_time%60):02d}")
+            # --- Dedicated Metric Columns ---
+            display_time = min(curr_time, d['t_out'])
+            ui['metric_eta'].metric("TGT ETA", f"{int(display_time/60):02d}:{int(display_time%60):02d}")
             
-            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
-            ui['metric_adv'].metric("ADVANTAGE", adv_str)
+            adv_str = f"+{d['adv_min']:.1f} M" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} M"
+            ui['metric_adv'].metric("ADV", adv_str)
+            
             ui['metric_hover'].metric("ON SCENE", f"{int(site_time/60):02d}:{int(site_time%60):02d}")
             
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
-            ui['metric_batt'].metric("BATTERY", f"{int(pct)}%")
+            ui['metric_batt'].metric("BATT", f"{int(pct)}%")
+            
+            t_min = int(d['turnaround_min'])
+            t_sec = int((d['turnaround_min'] * 60) % 60)
+            ui['metric_rechg'].metric("RECHARGE", f"{t_min:02d}:{t_sec:02d}")
 
     if not st.session_state.sim_completed:
         for tick in range(101):
