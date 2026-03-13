@@ -150,7 +150,7 @@ st.markdown("""
     }
     .metric-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 12px;
     }
     .m-box { display: flex; flex-direction: column; }
@@ -285,7 +285,7 @@ left_col, mid_col = st.columns([7, 3])
 with mid_col:
     # --- STEP 1: ONLY SHOW OPS CENTER AND ZIP HERE ---
     if st.session_state.step == 1:
-        st.markdown("### 🚁 OPS CENTER")
+        st.markdown("### OPS CENTER")
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
         with zip_col:
             zip_in = st.text_input("ZIP", placeholder="ZIP + ENTER", label_visibility="collapsed", max_chars=5, key="zip_input")
@@ -311,16 +311,16 @@ with mid_col:
         with asset_col:
             if st.session_state.target and st.session_state.base:
                 dist = get_distance_miles(st.session_state.base, st.session_state.target)
-                heli_cost = 1.0 * 850 
+                heli_cost = 1.0 * 1300 
                 
-                with st.popover("🚁 AIR ASSET", use_container_width=True):
+                with st.popover("AIR ASSET", use_container_width=True):
                     st.markdown(f"""
                     <div style="background-color: #050505; padding: 10px; border-radius: 5px;">
                         <div style="text-align: center; margin-bottom: 20px; margin-top: 10px;">
                             <div style="display: inline-block; border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 50%; padding: 4px;">
                                 <div style="border: 2px solid rgba(0, 210, 255, 0.6); border-radius: 50%; padding: 6px;">
                                     <div style="border: 2px solid #00D2FF; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
-                                        <span style="color: #00D2FF; font-weight: bold; font-family: sans-serif; font-size: 16px;">🔗</span>
+                                        <span style="color: #00D2FF; font-weight: bold; font-family: sans-serif; font-size: 16px;">$</span>
                                     </div>
                                 </div>
                             </div>
@@ -328,12 +328,10 @@ with mid_col:
                         <hr style="border-color: #333; margin-bottom: 20px;">
                         <div style="background-color: #000000; border: 1px solid #222; padding: 20px; border-radius: 4px; text-align: center; margin-bottom: 15px;">
                             <h6 style="color: #ffffff; margin: 0; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Manrope', sans-serif;">EST. HELICOPTER COST FOR THIS CALL</h6>
-                            <h2 style="color: #00D2FF; margin: 15px 0; font-family: 'IBM Plex Mono', monospace; font-size: 2.5rem;">${heli_cost:.2f}</h2>
-                            <div style="color: #797979; font-size: 0.7rem;">BASED ON $850/HR OP COST</div>
+                            <h2 style="color: #00D2FF; margin: 15px 0; font-family: 'IBM Plex Mono', monospace; font-size: 2.5rem;">${heli_cost:,.2f}</h2>
+                            <div style="color: #797979; font-size: 0.7rem;">BASED ON $1,300/HR OP COST</div>
                         </div>
                         <div style="border: 1px solid #222; padding: 15px; border-radius: 4px; background-color: #000000; font-family: 'Manrope', sans-serif;">
-                            <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">ROUND-TRIP DISTANCE: <span style="color:#ffffff;">{dist * 2:.1f} MI</span></div>
-                            <div style="color: #797979; font-size: 0.9rem; margin-bottom: 8px;">CRUISE SPEED: <span style="color:#ffffff;">120 MPH</span></div>
                             <div style="color: #797979; font-size: 0.9rem;">TOTAL FLIGHT TIME (W/ HOVER): <span style="color:#ffffff;">60 MIN</span></div>
                         </div>
                     </div>
@@ -342,9 +340,9 @@ with mid_col:
         st.divider()
 
         if not st.session_state.base:
-            st.warning("📍 SET BASE")
+            st.warning("SET BASE")
         elif not st.session_state.target:
-            st.info("🎯 SET TARGET")
+            st.info("SET TARGET")
         else:
             incident_placeholder = st.empty()
 
@@ -432,6 +430,7 @@ with left_col:
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
+            randomize_squads() 
             generate_incident() 
             # Lock in the responding officer the moment the map is clicked
             calculate_responding_officer() 
@@ -481,20 +480,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
     
-    for d in fleet_sim_data:
-        if d['possible']:
-            drone_arrive_dt = st.session_state.t_launch + timedelta(seconds=d['t_out'])
-            # Uses the locked officer time instead of recalculating
-            adv_sec = (st.session_state.t_officers - drone_arrive_dt).total_seconds()
-            d['adv_min'] = adv_sec / 60.0
-        else:
-            d['adv_min'] = 0.0
-
-    for i, d in enumerate(valid):
-        if i == 0: d['perf_color'] = "#00D2FF" 
-        elif i == 1: d['perf_color'] = "#ffffff" 
-        else: d['perf_color'] = "#797979" 
-
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
     def render_ui_state(curr_time, log_html_override=None):
@@ -513,7 +498,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         log_events.sort(key=lambda x: x[0])
 
         if log_html_override is None:
-            log_html = f"""<div class="incident-log"><div class="log-header">📋 INCIDENT LOG</div>"""
+            log_html = f"""<div class="incident-log"><div class="log-header">INCIDENT LOG</div>"""
             for dt, html_str in log_events:
                 log_html += f'<div class="log-entry"><span class="log-time">{dt.strftime("%H:%M:%S")}</span>{html_str}</div>'
             log_html += "</div>"
@@ -533,7 +518,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 <div class="drone-card">
                     <div class="metric-grid">
                         <div class="m-box"><div class="m-label">TIME TO TGT</div><div class="m-val-dim">N/A</div></div>
-                        <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val-dim">N/A</div></div>
                         <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val-dim">N/A</div></div>
                         <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val-dim">N/A</div></div>
                     </div>
@@ -547,7 +531,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             is_rtb_complete = False
             
             if curr_time < d['t_out']:
-                phase_txt = ">> OUTBOUND"
+                phase_txt = "OUTBOUND"
                 flight_prog = curr_time / d['t_out']
                 is_active = True
             elif curr_time < (d['t_out'] + d['t_hov']):
@@ -555,14 +539,14 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 1.0
                 is_active = True
             elif curr_time < d['t_total']:
-                phase_txt, site_time = "<< RTB", d['t_hov']
+                phase_txt, site_time = "RTB", d['t_hov']
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
                 is_active = True
             else:
                 if ui['specs']['model'].upper() == 'GUARDIAN':
-                    phase_txt = "🔄 SWAPPING BATT"
+                    phase_txt = "SWAPPING BATT"
                 else:
-                    phase_txt = "⚡ RECHARGING"
+                    phase_txt = "RECHARGING"
                 
                 phase_col = "#FFC300" 
                 site_time = d['t_hov']
@@ -577,21 +561,22 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
             # --- Dynamic Metric Card Logic ---
+            used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
+            
             eta_label = "TIME TO TGT"
             if is_rtb_complete:
-                t_min = int(d['turnaround_min'])
-                t_sec = int((d['turnaround_min'] * 60) % 60)
+                mission_progress = used / d['t_total'] if d['t_total'] > 0 else 0
+                current_recharge_min = d['turnaround_min'] * mission_progress
+                t_min = int(current_recharge_min)
+                t_sec = int((current_recharge_min * 60) % 60)
                 eta_label = "<span style='color: #ffffff;'>RECHARGE</span>"
                 eta_val = f"{t_min:02d}m {t_sec:02d}s"
             else:
                 display_time = min(curr_time, d['t_out'])
                 eta_val = f"{int(display_time/60):02d}:{int(display_time%60):02d}"
             
-            adv_str = f"+{d['adv_min']:.1f} MIN" if d['adv_min'] > 0 else f"{d['adv_min']:.1f} MIN"
-            adv_val = adv_str
             hov_val = f"{int(site_time/60):02d}:{int(site_time%60):02d}"
             
-            used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             bat_val = f"{int(pct)}%"
 
@@ -599,7 +584,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             <div class="drone-card">
                 <div class="metric-grid">
                     <div class="m-box"><div class="m-label">{eta_label}</div><div class="m-val">{eta_val}</div></div>
-                    <div class="m-box"><div class="m-label">ADVANTAGE</div><div class="m-val">{adv_val}</div></div>
                     <div class="m-box"><div class="m-label">ON SCENE</div><div class="m-val">{hov_val}</div></div>
                     <div class="m-box"><div class="m-label">BATTERY</div><div class="m-val">{bat_val}</div></div>
                 </div>
@@ -616,9 +600,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
-        
-        # We can now safely shuffle the cars here! 
-        # The metrics won't change because they read from the locked state.
         randomize_squads() 
         st.rerun()
         
