@@ -547,8 +547,12 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             ui['metric_batt'].metric("BATT", f"{int(pct)}%")
             
-            t_min = int(d['turnaround_min'])
-            t_sec = int((d['turnaround_min'] * 60) % 60)
+            # --- Dynamic Recharge Climb ---
+            mission_progress = used / d['t_total'] if d['t_total'] > 0 else 0
+            current_recharge_min = d['turnaround_min'] * mission_progress
+            
+            t_min = int(current_recharge_min)
+            t_sec = int((current_recharge_min * 60) % 60)
             ui['metric_rechg'].metric("RECHARGE", f"{t_min:02d}:{t_sec:02d}")
 
     if not st.session_state.sim_completed:
