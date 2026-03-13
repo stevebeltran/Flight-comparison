@@ -401,6 +401,7 @@ with left_col:
             st.rerun()
         elif st.session_state.target != coords:
             st.session_state.target = coords
+            randomize_squads() # <--- SQUADS ONLY SHUFFLE WHEN YOU CLICK A NEW TARGET NOW
             generate_incident() 
             st.session_state.step = 3
             st.session_state.sim_completed = False
@@ -564,7 +565,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
-        randomize_squads() 
+        # ---> REMOVED randomize_squads() FROM HERE <---
         st.rerun()
         
     else:
