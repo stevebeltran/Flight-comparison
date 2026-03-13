@@ -16,13 +16,14 @@ st.set_page_config(layout="wide", page_title="Tactical Drone Command", initial_s
 # --- Session State Initialization ---
 if 'step' not in st.session_state: st.session_state.step = 1
 if 'map_center' not in st.session_state: st.session_state.map_center = [39.8283, -98.5795]
-if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 4 
+if 'map_zoom' not in st.session_state: st.session_state.map_zoom = 4 # Starts panned out over the US
 if 'base' not in st.session_state: st.session_state.base = None
 if 'target' not in st.session_state: st.session_state.target = None
 if 'inc_type' not in st.session_state: st.session_state.inc_type = None
 if 'squad_cars' not in st.session_state: st.session_state.squad_cars = []
 if 'sim_completed' not in st.session_state: st.session_state.sim_completed = False
 if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
+# Added state locks for the responding officer so metrics don't jump when cars shuffle
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 
@@ -50,7 +51,7 @@ st.markdown("""
     h3 { font-size: 1.2rem !important; }
     
     .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
-    div.stVerticalBlock > div { gap: 0.2rem !important; } 
+    div.stVerticalBlock > div { gap: 0.2rem !important; } /* TIGHTENED GLOBAL GAP */
     
     /* Metrics */
     div[data-testid="stMetricValue"] {
@@ -76,11 +77,13 @@ st.markdown("""
         font-family: 'Manrope', sans-serif;
     }
     
+    /* Hover state */
     div.stButton > button:hover, div[data-testid="stPopover"] > button:hover {
         border-color: #00D2FF !important;
         color: #00D2FF !important;
     }
     
+    /* Active, Focus, and Opened states for buttons to prevent turning white */
     div.stButton > button:focus, div.stButton > button:active,
     div[data-testid="stPopover"] > button:focus, div[data-testid="stPopover"] > button:active,
     div[data-testid="stPopover"] > button[aria-expanded="true"] {
@@ -89,11 +92,13 @@ st.markdown("""
         border-color: #00D2FF !important;
     }
 
+    /* Force Popover Body to be strictly Black */
     div[data-testid="stPopoverBody"], div[role="dialog"] {
         background-color: #050505 !important;
         border: 1px solid #333 !important;
     }
     
+    /* Input Styling */
     .stTextInput input { 
         background-color: #111 !important; 
         color: #ffffff !important; 
@@ -110,6 +115,7 @@ st.markdown("""
         0%, 49% { color: #797979; text-shadow: none; }
         50%, 100% { color: #00D2FF; text-shadow: 0 0 8px #00D2FF; }
     }
+    /* ADDED NEGATIVE MARGIN TO PULL PROGRESS BAR UP */
     .drone-active { animation: dronePulse 0.8s infinite; font-weight: bold; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; display: block; margin-bottom: -10px; }
     .drone-static { color: #ffffff; font-weight: bold; text-shadow: none; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; display: block; margin-bottom: -10px; }
 
@@ -118,16 +124,17 @@ st.markdown("""
         background-color: #111;
         border: 1px solid #333;
         border-radius: 5px;
-        padding: 8px; 
+        padding: 8px; /* Tighter padding */
         margin-bottom: 8px;
         font-family: 'IBM Plex Mono', monospace;
         font-size: 0.8rem;
-        min-height: 80px;  
+        min-height: 80px;  /* Squished height */
     }
     .log-header { color: #ffffff; font-size: 0.85rem; border-bottom: 1px solid #333; margin-bottom: 6px; padding-bottom: 4px; font-weight: bold; }
     .log-entry { margin-bottom: 2px; color: #797979; }
     .log-time { color: #797979; margin-right: 12px; }
     
+    /* Muted Log Colors */
     .log-critical { color: #ffffff; font-weight: bold; }
     .log-action { color: #00D2FF; font-weight: bold; }
     .log-success { color: #00D2FF; font-weight: bold; }
@@ -138,33 +145,33 @@ st.markdown("""
         background-color: #080808;
         border: 1px solid #222;
         border-radius: 4px;
-        padding: 6px 10px; 
+        padding: 6px 10px; /* Tighter padding */
         margin-top: 2px;
         margin-bottom: 0px;
     }
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 6px; 
+        gap: 6px; /* Tighter gap */
     }
     .m-box { display: flex; flex-direction: column; }
     .m-label {
         color: #797979;
-        font-size: 0.55rem; 
+        font-size: 0.55rem; /* Smaller font */
         font-family: 'Manrope', sans-serif;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 0px; 
+        margin-bottom: 0px; /* Removed margin */
     }
     .m-val {
         color: #00D2FF;
-        font-size: 0.95rem; 
+        font-size: 0.95rem; /* Smaller font */
         font-family: 'IBM Plex Mono', monospace;
         font-weight: bold;
     }
     .m-val-dim {
         color: #444444;
-        font-size: 0.95rem; 
+        font-size: 0.95rem; /* Smaller font */
         font-family: 'IBM Plex Mono', monospace;
     }
     </style>
@@ -179,6 +186,7 @@ def load_data():
         df.columns = df.columns.str.strip()
         return df
     except:
+        # Fallback dictionary
         data = {
             'model': ['RESPONDER', 'GUARDIAN', 'SKYDIO X-10', 'MATRICE 4TD'],
             'flight_time_min': [42, 60, 40, 54],
@@ -190,7 +198,7 @@ def load_data():
 def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
-        'GUARDIAN': 1, 
+        'GUARDIAN': 1, # 60 seconds battery swap
         'SKYDIO': 90,
         'MATRICE': 55
     }
@@ -248,6 +256,7 @@ def randomize_squads():
             st.session_state.squad_cars.append([st.session_state.base[0] + d_lat, st.session_state.base[1] + d_lon])
 
 def calculate_responding_officer():
+    """Calculates closest squad car and locks the ETA into session state."""
     best_dist = float('inf')
     best_sq = None
     if st.session_state.base and st.session_state.target and st.session_state.squad_cars:
@@ -267,85 +276,6 @@ def calculate_responding_officer():
             t_officer_dispatch = st.session_state.t_call + timedelta(seconds=60)
             officer_travel_sec = (best_dist * 1.4) / (35.0 / 3600.0)
             st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
-
-# --- Dynamic Map Marker Functions ---
-def get_drone_pos(stage, base, target, index):
-    """Calculates drone position based on stage, with a micro-offset so they don't overlap."""
-    if stage == 0 or stage == 4:
-        base_lat, base_lon = base[0], base[1]
-    elif stage == 1 or stage == 3:
-        base_lat, base_lon = (base[0] + target[0]) / 2.0, (base[1] + target[1]) / 2.0
-    else: # stage 2 (On Scene)
-        base_lat, base_lon = target[0], target[1]
-        
-    # Offset based on index to form a neat 2x2 cluster on the map
-    lat_offset = 0.0015 if index in [0, 1] else -0.0015
-    lon_offset = 0.0015 if index in [0, 2] else -0.0015
-    
-    return [base_lat + lat_offset, base_lon + lon_offset]
-
-def generate_base_map(drones_to_draw=None):
-    """Generates the folium map and injects tactical animated drone markers if requested."""
-    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
-    
-    if st.session_state.base:
-        base_html = """<div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-home"></i></div>"""
-        folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
-        
-        rings = [2, 4, 6, 8]
-        for r in rings:
-            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color='#00D2FF', weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
-            lat_offset = (r / 69.0)
-            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:#00D2FF; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
-
-        is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
-
-        for sq in st.session_state.squad_cars:
-            if is_responding:
-                car_color = "#FF0000" if sq == st.session_state.best_officer_sq else "#00D2FF"
-            else:
-                car_color = "#00D2FF"
-            car_html = f"""<div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;"><i class="fa fa-car"></i></div>"""
-            folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
-
-    if st.session_state.target:
-        target_html = """<div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-crosshairs"></i></div>"""
-        folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
-        
-        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
-        
-        if st.session_state.step == 3 and not st.session_state.sim_completed and st.session_state.best_officer_sq:
-            plugins.AntPath(locations=[st.session_state.best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
-
-    # --- INJECT DRONE MARKERS ---
-    if drones_to_draw and st.session_state.base and st.session_state.target:
-        for idx, d_info in enumerate(drones_to_draw):
-            pos = get_drone_pos(d_info['stage'], st.session_state.base, st.session_state.target, idx)
-            color = d_info['color']
-            letter = d_info['letter']
-            
-            html = f"""
-                <div style="
-                    background-color: {color}; 
-                    color: #000; 
-                    border-radius: 50%; 
-                    width: 22px; 
-                    height: 22px; 
-                    display: flex; 
-                    align-items: center; 
-                    justify-content: center; 
-                    font-weight: 900; 
-                    font-family: 'IBM Plex Mono', monospace;
-                    font-size: 14px;
-                    box-shadow: 0 0 12px {color};
-                    border: 2px solid #fff;
-                ">
-                    {letter}
-                </div>
-            """
-            folium.Marker(pos, icon=DivIcon(html=html, icon_anchor=(11,11))).add_to(m)
-
-    return m
 
 # --- Layout: Dynamic Columns ---
 left_col, mid_col = st.columns([7, 3])
@@ -379,6 +309,7 @@ with mid_col:
             
         with asset_col:
             if st.session_state.target and st.session_state.base:
+                dist = get_distance_miles(st.session_state.base, st.session_state.target)
                 heli_cost = 1.0 * 1300 
                 
                 with st.popover("AIR ASSET", use_container_width=True):
@@ -405,6 +336,7 @@ with mid_col:
                     </div>
                     """, unsafe_allow_html=True)
                     
+        # REPLACED st.divider() with tiny custom invisible spacer
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
         if not st.session_state.base:
@@ -435,40 +367,79 @@ with mid_col:
                         'metrics_html': metrics_placeholder 
                     }
                     drone_ui_elements.append(ui_obj)
+                    
+                    # REPLACED st.divider() with tiny custom spacer
                     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
 # COLUMN 1: MAP
 # ==========================================
 with left_col:
-    map_placeholder = st.empty()
-    is_simulating = st.session_state.step == 3 and not st.session_state.sim_completed
-    
-    # Static rendering & click handling when NOT simulating
-    if not is_simulating:
-        with map_placeholder:
-            m_static = generate_base_map()
-            map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map")
-            
-            if map_data['last_clicked']:
-                coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
-                if not st.session_state.base:
-                    st.session_state.base = coords
-                    st.session_state.map_zoom = 12 
-                    randomize_squads() 
-                    st.session_state.sim_completed = False
-                    st.rerun()
-                elif st.session_state.target != coords:
-                    st.session_state.target = coords
-                    randomize_squads() 
-                    generate_incident() 
-                    calculate_responding_officer() 
-                    st.session_state.step = 3
-                    st.session_state.sim_completed = False
-                    st.rerun()
+    m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
+
+    if st.session_state.base:
+        base_html = """
+        <div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;">
+            <i class="fa fa-home"></i>
+        </div>
+        """
+        folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
+        
+        rings = [2, 4, 6, 8]
+        for r in rings:
+            folium.Circle(location=st.session_state.base, radius=r * 1609.34, color='#00D2FF', weight=1, fill=False, opacity=0.5, dash_array='4, 8').add_to(m)
+            lat_offset = (r / 69.0)
+            folium.map.Marker([st.session_state.base[0] + lat_offset, st.session_state.base[1]], icon=DivIcon(icon_size=(100,20), icon_anchor=(50,10), html=f'<div style="font-family: \'Manrope\', sans-serif; font-size:10px; font-weight:600; color:#00D2FF; text-shadow: 0 0 5px #000;">{r} MI</div>')).add_to(m)
+
+        is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
+
+        for sq in st.session_state.squad_cars:
+            if is_responding:
+                car_color = "#FF0000" if sq == st.session_state.best_officer_sq else "#00D2FF"
+            else:
+                car_color = "#00D2FF"
+
+            car_html = f"""
+            <div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;">
+                <i class="fa fa-car"></i>
+            </div>
+            """
+            folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
+
+    if st.session_state.target:
+        target_html = """
+        <div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;">
+            <i class="fa fa-crosshairs"></i>
+        </div>
+        """
+        folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
+        
+        plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
+        
+        if st.session_state.step == 3 and not st.session_state.sim_completed and st.session_state.best_officer_sq:
+            plugins.AntPath(locations=[st.session_state.best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
+
+    map_data = st_folium(m, height=850, use_container_width=True, key="map")
+
+    if map_data['last_clicked']:
+        coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
+        if not st.session_state.base:
+            st.session_state.base = coords
+            st.session_state.map_zoom = 12 
+            randomize_squads() 
+            st.session_state.sim_completed = False
+            st.rerun()
+        elif st.session_state.target != coords:
+            st.session_state.target = coords
+            randomize_squads() 
+            generate_incident() 
+            calculate_responding_officer() 
+            st.session_state.step = 3
+            st.session_state.sim_completed = False
+            st.rerun()
 
 # ==========================================
-# SIMULATION LOOP
+# SIMULATION LOOP OR STATIC RENDER
 # ==========================================
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
@@ -508,11 +479,9 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     
     fastest_t_out = min([d['t_out'] for d in valid]) if valid else 0
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
+
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
-    # 4 distinct tactical colors for the drones
-    DRONE_COLORS = ["#FF00FF", "#00D2FF", "#39FF14", "#FF6F00"] 
-
     def render_ui_state(curr_time, log_html_override=None):
         log_events = [
             (st.session_state.t_call, f'<span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span>'),
@@ -541,6 +510,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         for d in fleet_sim_data:
             ui = d['ui']
             if not d['possible']:
+                # Added wrapper div to apply negative margin and compress height
                 ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:#797979; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{d['fail_msg']}</span></div>", unsafe_allow_html=True)
                 ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
                 ui['flight_bar'].progress(0.0)
@@ -570,8 +540,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 flight_prog = 1.0
                 is_active = True
             elif curr_time < d['t_total']:
-                phase_txt = "RTB"
-                site_time = d['t_hov']
+                phase_txt, site_time = "RTB", d['t_hov']
                 flight_prog = 1.0 - ((curr_time - d['t_out'] - d['t_hov']) / d['t_out'])
                 is_active = True
             else:
@@ -588,6 +557,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
             name_class = "drone-active" if is_active else "drone-static"
             ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
+            # Added wrapper div to apply negative margin and compress height
             ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:{phase_col}; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span></div>", unsafe_allow_html=True)
             ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
             
@@ -606,6 +576,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 eta_val = f"{int(display_time/60):02d}:{int(display_time%60):02d}"
             
             hov_val = f"{int(site_time/60):02d}:{int(site_time%60):02d}"
+            
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             bat_val = f"{int(pct)}%"
 
@@ -620,53 +591,16 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             """
             ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
 
-    # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        last_stages_hash = None
-        
         for tick in range(101):
             curr_time = (tick / 100) * sim_dur
             render_ui_state(curr_time)
-            
-            # --- 3-Stage Map Update Logic ---
-            current_drones = []
-            for idx, d in enumerate(valid):
-                t_out = d['t_out']
-                t_hov = d['t_hov']
-                t_total = d['t_total']
-                
-                # Assign 1 of the 5 discrete stages
-                if curr_time < t_out * 0.15:
-                    stage = 0 # Base
-                elif curr_time < t_out * 0.85:
-                    stage = 1 # Midpoint (Outbound)
-                elif curr_time < t_out + t_hov * 0.85:
-                    stage = 2 # On Scene
-                elif curr_time < t_total - (t_out * 0.15):
-                    stage = 3 # Midpoint (Inbound)
-                else:
-                    stage = 4 # Base (Returned)
-                    
-                current_drones.append({
-                    'stage': stage,
-                    'color': DRONE_COLORS[idx % 4],
-                    'letter': d['ui']['specs']['model'][0].upper()
-                })
-                
-            stages_hash = "-".join([str(x['stage']) for x in current_drones])
-            
-            # ONLY redraw the Folium map if the drones have moved to a new stage
-            if stages_hash != last_stages_hash:
-                with map_placeholder:
-                    m_sim = generate_base_map(drones_to_draw=current_drones)
-                    st_folium(m_sim, height=850, use_container_width=True, key=f"sim_map_{stages_hash}")
-                last_stages_hash = stages_hash
-                
             time.sleep(0.16)
 
         time.sleep(3.0) 
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
+        randomize_squads() 
         st.rerun()
         
     else:
