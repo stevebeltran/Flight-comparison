@@ -268,6 +268,12 @@ def calculate_responding_officer():
             officer_travel_sec = (best_dist * 1.4) / (35.0 / 3600.0)
             st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
+# --- Presenter Controls (Hidden in Sidebar) ---
+with st.sidebar:
+    st.markdown("### PRESENTER CONTROLS")
+    anim_duration = st.slider("Simulation Duration (Seconds)", min_value=5, max_value=60, value=16, step=1)
+    st.caption("Adjusts how long the simulation animation takes to complete.")
+
 # --- Layout: Dynamic Columns ---
 left_col, mid_col = st.columns([7, 3])
 
@@ -582,10 +588,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
+        # Divide the total slider seconds by the 101 animation frames
+        sleep_per_tick = anim_duration / 101.0
+        
         for tick in range(101):
             curr_time = (tick / 100) * sim_dur
             render_ui_state(curr_time)
-            time.sleep(0.16)
+            time.sleep(sleep_per_tick)
 
         time.sleep(3.0) 
         st.session_state.sim_completed = True
