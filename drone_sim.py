@@ -25,6 +25,8 @@ if 'sim_completed' not in st.session_state: st.session_state.sim_completed = Fal
 if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
+# --- NEW: Click Lock to prevent flickering loops ---
+if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -288,7 +290,6 @@ left_col, mid_col = st.columns([7, 3])
 with mid_col:
     # --- Stealthy Presenter Controls ---
     with st.expander("⚙️", expanded=False):
-        # Upped the max_value to 120 seconds (2 minutes)
         anim_duration = st.slider("Sim Duration (Sec)", min_value=5, max_value=120, value=16, step=1)
 
     if st.session_state.step == 1:
@@ -369,7 +370,7 @@ with mid_col:
                         'status_text': status_placeholder,
                         'flight_bar': flight_bar,
                         'metrics_html': metrics_placeholder,
-                        'cache': {} # We added a cache dictionary here to prevent full-screen flashing
+                        'cache': {}
                     }
                     drone_ui_elements.append(ui_obj)
                     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -377,7 +378,7 @@ with mid_col:
 # ==========================================
 # COLUMN 1: MAP
 # ==========================================
-def generate_base_map(drones_to_draw=None):
+def generate_base_map():
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
     
     if st.session_state.base:
@@ -412,30 +413,35 @@ def generate_base_map(drones_to_draw=None):
     return m
 
 with left_col:
-    map_placeholder = st.empty()
+    m_static = generate_base_map()
+    
+    # --- MAGIC FIX: returned_objects restricts refreshes to ONLY mouse clicks ---
+    map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map", returned_objects=["last_clicked"])
+    
     is_simulating = st.session_state.step == 3 and not st.session_state.sim_completed
     
-    if not is_simulating:
-        with map_placeholder:
-            m_static = generate_base_map()
-            map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map")
+    # Process Map Clicks ONLY if we aren't mid-simulation
+    if not is_simulating and map_data.get('last_clicked'):
+        coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
+        
+        # --- MAGIC FIX: Click Lock ensures we don't process the same click twice ---
+        if coords != st.session_state.last_processed_click:
+            st.session_state.last_processed_click = coords
             
-            if map_data['last_clicked']:
-                coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
-                if not st.session_state.base:
-                    st.session_state.base = coords
-                    st.session_state.map_zoom = 12 
-                    randomize_squads() 
-                    st.session_state.sim_completed = False
-                    st.rerun()
-                elif st.session_state.target != coords:
-                    st.session_state.target = coords
-                    randomize_squads() 
-                    generate_incident() 
-                    calculate_responding_officer() 
-                    st.session_state.step = 3
-                    st.session_state.sim_completed = False
-                    st.rerun()
+            if not st.session_state.base:
+                st.session_state.base = coords
+                st.session_state.map_zoom = 12 
+                randomize_squads() 
+                st.session_state.sim_completed = False
+                st.rerun()
+            elif st.session_state.target != coords:
+                st.session_state.target = coords
+                randomize_squads() 
+                generate_incident() 
+                calculate_responding_officer() 
+                st.session_state.step = 3
+                st.session_state.sim_completed = False
+                st.rerun()
 
 # ==========================================
 # SIMULATION LOOP
@@ -503,7 +509,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             log_html = log_html_override
             
-        # Delta update for Incident Log
         if getattr(st.session_state, 'last_rendered_log', None) != log_html:
             incident_placeholder.markdown(log_html, unsafe_allow_html=True)
             st.session_state.last_rendered_log = log_html
@@ -577,15 +582,12 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             
-            # Column 1: Always TIME TO TGT
             eta_label = "TIME TO TGT"
             display_time = min(curr_time, d['t_out'])
             eta_val = f"{int(display_time/60):02d}:{int(display_time%60):02d}"
             
-            # Column 2: Always ON SCENE
             hov_val = f"{int(site_time/60):02d}:{int(site_time%60):02d}"
             
-            # Column 3: BATTERY or RECHARGE
             pct = max(0, 100 - (used / d['batt_cap'] * 100))
             if is_rtb_complete:
                 mission_progress = used / d['t_total'] if d['t_total'] > 0 else 0
@@ -608,7 +610,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             </div>
             """
             
-            # Delta Updates: Only push to the screen if the value changed
             if cache.get('name') != name_html:
                 ui['name_text'].markdown(name_html, unsafe_allow_html=True)
                 cache['name'] = name_html
