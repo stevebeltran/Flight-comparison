@@ -67,7 +67,7 @@ st.markdown("""
     .stProgress > div > div { height: 6px !important; }
     .stProgress > div > div > div > div { background-color: #00D2FF; }
 
-    /* Button and Popover Styling */
+    /* Button, Popover, and Expander Styling */
     div.stButton > button, div[data-testid="stPopover"] > button {
         background-color: #111 !important;
         color: #ffffff !important;
@@ -92,6 +92,17 @@ st.markdown("""
     div[data-testid="stPopoverBody"], div[role="dialog"] {
         background-color: #050505 !important;
         border: 1px solid #333 !important;
+    }
+    
+    /* Stealthy Expander */
+    div[data-testid="stExpander"] {
+        background-color: #111 !important;
+        border: 1px solid #333 !important;
+        border-radius: 5px;
+    }
+    div[data-testid="stExpander"] summary p {
+        color: #797979 !important;
+        font-family: 'IBM Plex Mono', monospace;
     }
     
     .stTextInput input { 
@@ -268,12 +279,6 @@ def calculate_responding_officer():
             officer_travel_sec = (best_dist * 1.4) / (35.0 / 3600.0)
             st.session_state.t_officers = t_officer_dispatch + timedelta(seconds=officer_travel_sec)
 
-# --- Presenter Controls (Hidden in Sidebar) ---
-with st.sidebar:
-    st.markdown("### PRESENTER CONTROLS")
-    anim_duration = st.slider("Simulation Duration (Seconds)", min_value=5, max_value=60, value=16, step=1)
-    st.caption("Adjusts how long the simulation animation takes to complete.")
-
 # --- Layout: Dynamic Columns ---
 left_col, mid_col = st.columns([7, 3])
 
@@ -281,6 +286,10 @@ left_col, mid_col = st.columns([7, 3])
 # COLUMN 2: OPS CENTER & ASSET COST
 # ==========================================
 with mid_col:
+    # --- Stealthy Presenter Controls ---
+    with st.expander("⚙️", expanded=False):
+        anim_duration = st.slider("Sim Duration (Sec)", min_value=5, max_value=60, value=16, step=1)
+
     if st.session_state.step == 1:
         st.markdown("### OPS CENTER")
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
@@ -367,15 +376,11 @@ with mid_col:
 # ==========================================
 # COLUMN 1: MAP
 # ==========================================
-with left_col:
+def generate_base_map(drones_to_draw=None):
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
-
+    
     if st.session_state.base:
-        base_html = """
-        <div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;">
-            <i class="fa fa-home"></i>
-        </div>
-        """
+        base_html = """<div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-home"></i></div>"""
         folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
         
         rings = [2, 4, 6, 8]
@@ -391,20 +396,11 @@ with left_col:
                 car_color = "#FF0000" if sq == st.session_state.best_officer_sq else "#00D2FF"
             else:
                 car_color = "#00D2FF"
-
-            car_html = f"""
-            <div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;">
-                <i class="fa fa-car"></i>
-            </div>
-            """
+            car_html = f"""<div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;"><i class="fa fa-car"></i></div>"""
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     if st.session_state.target:
-        target_html = """
-        <div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;">
-            <i class="fa fa-crosshairs"></i>
-        </div>
-        """
+        target_html = """<div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-crosshairs"></i></div>"""
         folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
         
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
@@ -412,27 +408,36 @@ with left_col:
         if st.session_state.step == 3 and not st.session_state.sim_completed and st.session_state.best_officer_sq:
             plugins.AntPath(locations=[st.session_state.best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
-    map_data = st_folium(m, height=850, use_container_width=True, key="map")
+    return m
 
-    if map_data['last_clicked']:
-        coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
-        if not st.session_state.base:
-            st.session_state.base = coords
-            st.session_state.map_zoom = 12 
-            randomize_squads() 
-            st.session_state.sim_completed = False
-            st.rerun()
-        elif st.session_state.target != coords:
-            st.session_state.target = coords
-            randomize_squads() 
-            generate_incident() 
-            calculate_responding_officer() 
-            st.session_state.step = 3
-            st.session_state.sim_completed = False
-            st.rerun()
+with left_col:
+    map_placeholder = st.empty()
+    is_simulating = st.session_state.step == 3 and not st.session_state.sim_completed
+    
+    if not is_simulating:
+        with map_placeholder:
+            m_static = generate_base_map()
+            map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map")
+            
+            if map_data['last_clicked']:
+                coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
+                if not st.session_state.base:
+                    st.session_state.base = coords
+                    st.session_state.map_zoom = 12 
+                    randomize_squads() 
+                    st.session_state.sim_completed = False
+                    st.rerun()
+                elif st.session_state.target != coords:
+                    st.session_state.target = coords
+                    randomize_squads() 
+                    generate_incident() 
+                    calculate_responding_officer() 
+                    st.session_state.step = 3
+                    st.session_state.sim_completed = False
+                    st.rerun()
 
 # ==========================================
-# SIMULATION LOOP OR STATIC RENDER
+# SIMULATION LOOP
 # ==========================================
 if st.session_state.step == 3 and st.session_state.base and st.session_state.target:
     dist_one_way = get_distance_miles(st.session_state.base, st.session_state.target)
