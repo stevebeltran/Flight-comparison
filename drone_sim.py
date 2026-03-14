@@ -25,8 +25,9 @@ if 'sim_completed' not in st.session_state: st.session_state.sim_completed = Fal
 if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
-# --- NEW: Click Lock to prevent flickering loops ---
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
+# Initialize default animation duration
+if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 16 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -94,17 +95,6 @@ st.markdown("""
     div[data-testid="stPopoverBody"], div[role="dialog"] {
         background-color: #050505 !important;
         border: 1px solid #333 !important;
-    }
-    
-    /* Stealthy Expander */
-    div[data-testid="stExpander"] {
-        background-color: #111 !important;
-        border: 1px solid #333 !important;
-        border-radius: 5px;
-    }
-    div[data-testid="stExpander"] summary p {
-        color: #797979 !important;
-        font-family: 'IBM Plex Mono', monospace;
     }
     
     .stTextInput input { 
@@ -288,10 +278,6 @@ left_col, mid_col = st.columns([7, 3])
 # COLUMN 2: OPS CENTER & ASSET COST
 # ==========================================
 with mid_col:
-    # --- Stealthy Presenter Controls ---
-    with st.expander("⚙️", expanded=False):
-        anim_duration = st.slider("Sim Duration (Sec)", min_value=5, max_value=120, value=16, step=1)
-
     if st.session_state.step == 1:
         st.markdown("### OPS CENTER")
         zip_col, space_col, logo_col = st.columns([1, 1, 2])
@@ -311,10 +297,17 @@ with mid_col:
                 st.error("Invalid ZIP code. (Try again)")
 
     elif st.session_state.step >= 2:
-        asset_col, space_col, logo_col = st.columns([1.5, 0.5, 2])
+        # Compacted layout for gear, air asset, and logo
+        gear_col, asset_col, space_col, logo_col = st.columns([0.6, 1.5, 0.4, 2])
+        
         with logo_col:
             st.image("logo.png", use_container_width=True)
             
+        with gear_col:
+            with st.popover("⚙️", use_container_width=True):
+                # Tied directly to session state
+                st.slider("Sim Secs", min_value=5, max_value=120, key="anim_duration")
+                
         with asset_col:
             if st.session_state.target and st.session_state.base:
                 heli_cost = 1.0 * 1300 
@@ -415,16 +408,13 @@ def generate_base_map():
 with left_col:
     m_static = generate_base_map()
     
-    # --- MAGIC FIX: returned_objects restricts refreshes to ONLY mouse clicks ---
     map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map", returned_objects=["last_clicked"])
     
     is_simulating = st.session_state.step == 3 and not st.session_state.sim_completed
     
-    # Process Map Clicks ONLY if we aren't mid-simulation
     if not is_simulating and map_data.get('last_clicked'):
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         
-        # --- MAGIC FIX: Click Lock ensures we don't process the same click twice ---
         if coords != st.session_state.last_processed_click:
             st.session_state.last_processed_click = coords
             
@@ -628,7 +618,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        sleep_per_tick = anim_duration / 101.0
+        # Reads directly from session_state connected to the popover slider
+        sleep_per_tick = st.session_state.anim_duration / 101.0
         
         for tick in range(101):
             curr_time = (tick / 100) * sim_dur
