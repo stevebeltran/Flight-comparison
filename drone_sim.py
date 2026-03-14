@@ -67,7 +67,7 @@ st.markdown("""
     .stProgress > div > div { height: 6px !important; }
     .stProgress > div > div > div > div { background-color: #00D2FF; }
 
-    /* Button, Popover, and Expander Styling */
+    /* Button and Popover Styling */
     div.stButton > button, div[data-testid="stPopover"] > button {
         background-color: #111 !important;
         color: #ffffff !important;
@@ -288,7 +288,8 @@ left_col, mid_col = st.columns([7, 3])
 with mid_col:
     # --- Stealthy Presenter Controls ---
     with st.expander("⚙️", expanded=False):
-        anim_duration = st.slider("Sim Duration (Sec)", min_value=5, max_value=60, value=16, step=1)
+        # Upped the max_value to 120 seconds (2 minutes)
+        anim_duration = st.slider("Sim Duration (Sec)", min_value=5, max_value=120, value=16, step=1)
 
     if st.session_state.step == 1:
         st.markdown("### OPS CENTER")
@@ -357,7 +358,6 @@ with mid_col:
                 with st.container():
                     head_c1, head_c2 = st.columns([1.8, 1])
                     name_placeholder = head_c1.empty()
-                    name_placeholder.markdown(f"<span class='drone-static'>{row['model']}</span>", unsafe_allow_html=True)
                     status_placeholder = head_c2.empty()
                     
                     flight_bar = st.progress(0)
@@ -368,7 +368,8 @@ with mid_col:
                         'name_text': name_placeholder,
                         'status_text': status_placeholder,
                         'flight_bar': flight_bar,
-                        'metrics_html': metrics_placeholder 
+                        'metrics_html': metrics_placeholder,
+                        'cache': {} # We added a cache dictionary here to prevent full-screen flashing
                     }
                     drone_ui_elements.append(ui_obj)
                     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -502,15 +503,19 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             log_html = log_html_override
             
-        incident_placeholder.markdown(log_html, unsafe_allow_html=True)
+        # Delta update for Incident Log
+        if getattr(st.session_state, 'last_rendered_log', None) != log_html:
+            incident_placeholder.markdown(log_html, unsafe_allow_html=True)
+            st.session_state.last_rendered_log = log_html
 
         for d in fleet_sim_data:
             ui = d['ui']
+            cache = ui['cache']
+            
             if not d['possible']:
-                ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:#797979; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{d['fail_msg']}</span></div>", unsafe_allow_html=True)
-                ui['name_text'].markdown(f"<span class='drone-static'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
-                ui['flight_bar'].progress(0.0)
-                
+                status_html = f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:#797979; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{d['fail_msg']}</span></div>"
+                name_html = f"<span class='drone-static'>{ui['specs']['model']}</span>"
+                prog_val = 0.0
                 card_html = f"""
                 <div class="drone-card">
                     <div class="metric-grid">
@@ -520,7 +525,19 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                     </div>
                 </div>
                 """
-                ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
+                
+                if cache.get('status') != status_html:
+                    ui['status_text'].markdown(status_html, unsafe_allow_html=True)
+                    cache['status'] = status_html
+                if cache.get('name') != name_html:
+                    ui['name_text'].markdown(name_html, unsafe_allow_html=True)
+                    cache['name'] = name_html
+                if cache.get('prog') != prog_val:
+                    ui['flight_bar'].progress(prog_val)
+                    cache['prog'] = prog_val
+                if cache.get('card') != card_html:
+                    ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
+                    cache['card'] = card_html
                 continue
             
             phase_txt, phase_col, site_time = "", "#00D2FF", 0
@@ -553,9 +570,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 is_rtb_complete = True
 
             name_class = "drone-active" if is_active else "drone-static"
-            ui['name_text'].markdown(f"<span class='{name_class}'>{ui['specs']['model']}</span>", unsafe_allow_html=True)
-            ui['status_text'].markdown(f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:{phase_col}; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span></div>", unsafe_allow_html=True)
-            ui['flight_bar'].progress(max(0.0, min(flight_prog, 1.0)))
+            
+            name_html = f"<span class='{name_class}'>{ui['specs']['model']}</span>"
+            status_html = f"<div style='text-align:right; margin-bottom:-10px;'><span style='color:{phase_col}; font-size:0.8rem; font-weight:bold; font-family: \"IBM Plex Mono\", monospace;'>{phase_txt}</span></div>"
+            prog_val = max(0.0, min(flight_prog, 1.0))
             
             used = min(curr_time, d['t_out']) + max(0, min(curr_time - d['t_out'], d['t_hov'])) + max(0, min(curr_time - (d['t_out'] + d['t_hov']), d['t_out']))
             
@@ -589,11 +607,26 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 </div>
             </div>
             """
-            ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
+            
+            # Delta Updates: Only push to the screen if the value changed
+            if cache.get('name') != name_html:
+                ui['name_text'].markdown(name_html, unsafe_allow_html=True)
+                cache['name'] = name_html
+                
+            if cache.get('status') != status_html:
+                ui['status_text'].markdown(status_html, unsafe_allow_html=True)
+                cache['status'] = status_html
+                
+            if cache.get('prog') != prog_val:
+                ui['flight_bar'].progress(prog_val)
+                cache['prog'] = prog_val
+                
+            if cache.get('card') != card_html:
+                ui['metrics_html'].markdown(card_html, unsafe_allow_html=True)
+                cache['card'] = card_html
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        # Divide the total slider seconds by the 101 animation frames
         sleep_per_tick = anim_duration / 101.0
         
         for tick in range(101):
