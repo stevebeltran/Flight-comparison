@@ -147,12 +147,8 @@ st.markdown("""
 
     /* --- DRONE METRICS CARD --- */
     .drone-card {
-        background-color: #080808;
-        border: 1px solid #222;
-        border-radius: 4px;
-        padding: 6px 10px; 
-        margin-top: 2px;
-        margin-bottom: 0px;
+        padding: 4px 0px 0px 0px; 
+        margin-top: 4px;
     }
     .metric-grid {
         display: grid;
@@ -203,7 +199,7 @@ def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, 
-        'SKYDIO': 35,
+        'SKYDIO': 90,
         'MATRICE': 55
     }
     for key, val in mapping.items():
@@ -363,7 +359,8 @@ with mid_col:
             df = load_data()
             drone_ui_elements = [] 
             for index, row in df.iterrows():
-                with st.container():
+                # ADDED border=True right here to create the neat bounding boxes
+                with st.container(border=True):
                     head_c1, head_c2 = st.columns([1.8, 1])
                     name_placeholder = head_c1.empty()
                     status_placeholder = head_c2.empty()
@@ -380,7 +377,6 @@ with mid_col:
                         'cache': {}
                     }
                     drone_ui_elements.append(ui_obj)
-                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
 # COLUMN 1: MAP
@@ -388,11 +384,10 @@ with mid_col:
 def generate_base_map():
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
     
-    # Increased contrast to 1.6 to make streets pop
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.7) contrast(1.2);
+            filter: brightness(1.4) contrast(1.6);
         }
         </style>
     """))
@@ -417,7 +412,6 @@ def generate_base_map():
             car_html = f"""<div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;"><i class="fa fa-car"></i></div>"""
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
-    # --- Hide target and paths if the simulation has completed ---
     is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
     if st.session_state.target and is_responding:
         target_html = """<div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-crosshairs"></i></div>"""
@@ -435,7 +429,6 @@ with left_col:
     
     map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map", returned_objects=["last_clicked"])
     
-    # REMOVED the "not is_simulating" lock so map clicks interrupt the animation instantly!
     if map_data.get('last_clicked'):
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         
@@ -453,7 +446,7 @@ with left_col:
                 generate_incident() 
                 calculate_responding_officer() 
                 st.session_state.step = 3
-                st.session_state.sim_completed = False  # Immediately restarts the simulation!
+                st.session_state.sim_completed = False
                 st.rerun()
 
 # ==========================================
