@@ -203,7 +203,7 @@ def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, 
-        '': 35,
+        'SKYDIO': 90,
         'MATRICE': 55
     }
     for key, val in mapping.items():
@@ -323,7 +323,6 @@ with mid_col:
             
         with gear_col:
             with st.popover("⚙️", use_container_width=True):
-                # Disconnected from session state memory, locks default to 15
                 anim_duration = st.slider("Sim Secs", min_value=5, max_value=120, value=15)
                 
         with asset_col:
@@ -501,6 +500,9 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
+    # Local cache to prevent flickering, resets perfectly on page load
+    log_cache = [""] 
+    
     def render_ui_state(curr_time, log_html_override=None):
         log_events = [
             (st.session_state.t_call, f'<span class="log-{st.session_state.inc_severity}">{st.session_state.inc_type} - TARGET: {dist_one_way:.2f} MI</span>'),
@@ -524,9 +526,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             log_html = log_html_override
             
-        if getattr(st.session_state, 'last_rendered_log', None) != log_html:
+        # Using local cache so it persists accurately after sim completion
+        if log_cache[0] != log_html:
             incident_placeholder.markdown(log_html, unsafe_allow_html=True)
-            st.session_state.last_rendered_log = log_html
+            log_cache[0] = log_html
 
         for d in fleet_sim_data:
             ui = d['ui']
@@ -649,7 +652,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        # Reads the decoupled variable correctly!
         sleep_per_tick = anim_duration / 101.0
         
         for tick in range(101):
