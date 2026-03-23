@@ -26,7 +26,6 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
-# Initialize default animation duration
 if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 16 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
@@ -95,6 +94,17 @@ st.markdown("""
     div[data-testid="stPopoverBody"], div[role="dialog"] {
         background-color: #050505 !important;
         border: 1px solid #333 !important;
+    }
+    
+    /* Stealthy Expander */
+    div[data-testid="stExpander"] {
+        background-color: #111 !important;
+        border: 1px solid #333 !important;
+        border-radius: 5px;
+    }
+    div[data-testid="stExpander"] summary p {
+        color: #797979 !important;
+        font-family: 'IBM Plex Mono', monospace;
     }
     
     .stTextInput input { 
@@ -194,7 +204,7 @@ def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, 
-        'SKYDIO': 35,
+        'SKYDIO': 90,
         'MATRICE': 55
     }
     for key, val in mapping.items():
@@ -297,7 +307,6 @@ with mid_col:
                 st.error("Invalid ZIP code. (Try again)")
 
     elif st.session_state.step >= 2:
-        # Compacted layout for gear, air asset, and logo
         gear_col, asset_col, space_col, logo_col = st.columns([0.6, 1.5, 0.4, 2])
         
         with logo_col:
@@ -305,7 +314,6 @@ with mid_col:
             
         with gear_col:
             with st.popover("⚙️", use_container_width=True):
-                # Tied directly to session state
                 st.slider("Sim Secs", min_value=5, max_value=120, key="anim_duration")
                 
         with asset_col:
@@ -426,7 +434,7 @@ with left_col:
                 st.rerun()
             elif st.session_state.target != coords:
                 st.session_state.target = coords
-                randomize_squads() 
+                # SHUFFLE REMOVED FROM HERE
                 generate_incident() 
                 calculate_responding_officer() 
                 st.session_state.step = 3
@@ -618,7 +626,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        # Reads directly from session_state connected to the popover slider
         sleep_per_tick = st.session_state.anim_duration / 101.0
         
         for tick in range(101):
@@ -627,6 +634,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             time.sleep(sleep_per_tick)
 
         time.sleep(3.0) 
+        randomize_squads() # SHUFFLE ADDED HERE
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
         st.rerun()
