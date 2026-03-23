@@ -26,7 +26,6 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
-if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 15 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -389,10 +388,11 @@ with mid_col:
 def generate_base_map():
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
     
+    # Increased contrast to 1.6 to make streets pop
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.6) contrast(1.2);
+            filter: brightness(1.4) contrast(1.6);
         }
         </style>
     """))
@@ -418,6 +418,7 @@ def generate_base_map():
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
     # --- Hide target and paths if the simulation has completed ---
+    is_responding = st.session_state.step == 3 and not st.session_state.sim_completed
     if st.session_state.target and is_responding:
         target_html = """<div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-crosshairs"></i></div>"""
         folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
@@ -434,9 +435,8 @@ with left_col:
     
     map_data = st_folium(m_static, height=850, use_container_width=True, key="static_map", returned_objects=["last_clicked"])
     
-    is_simulating = st.session_state.step == 3 and not st.session_state.sim_completed
-    
-    if not is_simulating and map_data.get('last_clicked'):
+    # REMOVED the "not is_simulating" lock so map clicks interrupt the animation instantly!
+    if map_data.get('last_clicked'):
         coords = [map_data['last_clicked']['lat'], map_data['last_clicked']['lng']]
         
         if coords != st.session_state.last_processed_click:
@@ -453,7 +453,7 @@ with left_col:
                 generate_incident() 
                 calculate_responding_officer() 
                 st.session_state.step = 3
-                st.session_state.sim_completed = False
+                st.session_state.sim_completed = False  # Immediately restarts the simulation!
                 st.rerun()
 
 # ==========================================
