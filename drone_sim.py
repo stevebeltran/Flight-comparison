@@ -392,7 +392,7 @@ def generate_base_map():
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.4) contrast(1.6);
+            filter: brightness(1.7) contrast(1.2);
         }
         </style>
     """))
