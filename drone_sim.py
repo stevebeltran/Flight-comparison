@@ -382,6 +382,15 @@ with mid_col:
 def generate_base_map():
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
     
+    # --- MAGIC CSS INJECTION: Boost brightness and contrast for the map tiles ---
+    m.get_root().header.add_child(folium.Element("""
+        <style>
+        .leaflet-tile-pane {
+            filter: brightness(1.4) contrast(1.2);
+        }
+        </style>
+    """))
+    
     if st.session_state.base:
         base_html = """<div style="color: #00D2FF; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-home"></i></div>"""
         folium.Marker(st.session_state.base, icon=DivIcon(html=base_html, icon_anchor=(10,10))).add_to(m)
@@ -434,7 +443,6 @@ with left_col:
                 st.rerun()
             elif st.session_state.target != coords:
                 st.session_state.target = coords
-                # SHUFFLE REMOVED FROM HERE
                 generate_incident() 
                 calculate_responding_officer() 
                 st.session_state.step = 3
@@ -634,7 +642,7 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             time.sleep(sleep_per_tick)
 
         time.sleep(3.0) 
-        randomize_squads() # SHUFFLE ADDED HERE
+        randomize_squads()
         st.session_state.sim_completed = True
         st.session_state.has_run_once = True 
         st.rerun()
