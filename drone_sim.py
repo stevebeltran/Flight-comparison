@@ -382,11 +382,10 @@ with mid_col:
 def generate_base_map():
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles="CartoDB dark_matter")
     
-    # --- MAGIC CSS INJECTION: Boost brightness and contrast for the map tiles ---
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.5) contrast(1.2);
+            filter: brightness(1.4) contrast(1.2);
         }
         </style>
     """))
@@ -571,10 +570,11 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             else:
                 if ui['specs']['model'].upper() == 'GUARDIAN':
                     phase_txt = "SWAPPING BATT"
+                    phase_col = "#39FF14" # Vibrant Neon Green
                 else:
                     phase_txt = "RECHARGING"
+                    phase_col = "#FFC300" # Yellow
                 
-                phase_col = "#FFC300" 
                 site_time = d['t_hov']
                 flight_prog = 0.0
                 is_active = False
@@ -600,7 +600,13 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 current_recharge_min = d['turnaround_min'] * mission_progress
                 t_min = int(current_recharge_min)
                 t_sec = int((current_recharge_min * 60) % 60)
-                bat_label = "<span style='color: #ffffff;'>RECHARGE</span>"
+                
+                # Check for the Guardian model to adjust label
+                if ui['specs']['model'].upper() == 'GUARDIAN':
+                    bat_label = "<span style='color: #ffffff;'>BATTERY SWAP</span>"
+                else:
+                    bat_label = "<span style='color: #ffffff;'>RECHARGE</span>"
+                    
                 bat_val = f"{t_min:02d}m {t_sec:02d}s"
             else:
                 bat_label = "BATTERY"
