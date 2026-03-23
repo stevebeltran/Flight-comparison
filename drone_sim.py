@@ -26,8 +26,6 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
-# Changed default animation duration to 15 seconds
-if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 15 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -222,7 +220,7 @@ def get_lat_lon_from_zip(zip_code):
         if location: 
             return [location.latitude, location.longitude]
             
-        # Second attempt: Fallback string query for stubborn ZIPs like 61047
+        # Second attempt: Fallback string query for stubborn ZIPs
         location_fallback = geolocator.geocode(f"{zip_code}, United States")
         if location_fallback:
             return [location_fallback.latitude, location_fallback.longitude]
@@ -325,7 +323,8 @@ with mid_col:
             
         with gear_col:
             with st.popover("⚙️", use_container_width=True):
-                st.slider("Sim Secs", min_value=5, max_value=120, key="anim_duration")
+                # Disconnected from session state memory, locks default to 15
+                anim_duration = st.slider("Sim Secs", min_value=5, max_value=120, value=15)
                 
         with asset_col:
             if st.session_state.target and st.session_state.base:
@@ -650,7 +649,8 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
 
     # --- Live Simulation Loop ---
     if not st.session_state.sim_completed:
-        sleep_per_tick = st.session_state.anim_duration / 101.0
+        # Reads the decoupled variable correctly!
+        sleep_per_tick = anim_duration / 101.0
         
         for tick in range(101):
             curr_time = (tick / 100) * sim_dur
