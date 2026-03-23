@@ -199,7 +199,7 @@ def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, 
-        'SKYDIO': 90,
+        'SKYDIO': 35,
         'MATRICE': 55
     }
     for key, val in mapping.items():
@@ -387,7 +387,7 @@ def generate_base_map():
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.6) contrast(1.6);
+            filter: brightness(1.6) contrast(1.2);
         }
         </style>
     """))
