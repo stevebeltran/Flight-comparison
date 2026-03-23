@@ -26,6 +26,7 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
+if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 15 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -215,12 +216,10 @@ def get_full_recharge_time(model_name):
 def get_lat_lon_from_zip(zip_code):
     geolocator = Nominatim(user_agent="tactical_drone_command_ui_v3", timeout=10)
     try:
-        # First attempt: Strict structured query
         location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
         if location: 
             return [location.latitude, location.longitude]
             
-        # Second attempt: Fallback string query for stubborn ZIPs
         location_fallback = geolocator.geocode(f"{zip_code}, United States")
         if location_fallback:
             return [location_fallback.latitude, location_fallback.longitude]
@@ -303,7 +302,6 @@ with mid_col:
             st.image("logo.png", use_container_width=True)
             
         if zip_in and len(zip_in) == 5:
-            # Added visual spinner during the geocoding process
             with st.spinner("📡 Locating Target Zone..."):
                 coords = get_lat_lon_from_zip(zip_in)
             
@@ -394,7 +392,7 @@ def generate_base_map():
     m.get_root().header.add_child(folium.Element("""
         <style>
         .leaflet-tile-pane {
-            filter: brightness(1.6) contrast(1.2);
+            filter: brightness(1.4) contrast(1.2);
         }
         </style>
     """))
@@ -419,13 +417,14 @@ def generate_base_map():
             car_html = f"""<div style="color: {car_color}; font-size: 18px; text-shadow: 0 0 5px #000;"><i class="fa fa-car"></i></div>"""
             folium.Marker(sq, icon=DivIcon(html=car_html)).add_to(m)
 
-    if st.session_state.target:
+    # --- Hide target and paths if the simulation has completed ---
+    if st.session_state.target and is_responding:
         target_html = """<div style="color: #FF0000; font-size: 24px; text-shadow: 0 0 5px #000;"><i class="fa fa-crosshairs"></i></div>"""
         folium.Marker(st.session_state.target, icon=DivIcon(html=target_html, icon_anchor=(10,10))).add_to(m)
         
         plugins.AntPath(locations=[st.session_state.base, st.session_state.target], color="#00D2FF", pulse_color="#ffffff", weight=3, delay=800, dash_array=[10, 20]).add_to(m)
         
-        if st.session_state.step == 3 and not st.session_state.sim_completed and st.session_state.best_officer_sq:
+        if st.session_state.best_officer_sq:
             plugins.AntPath(locations=[st.session_state.best_officer_sq, st.session_state.target], color="#FF0000", pulse_color="#ffffff", weight=3, delay=400, dash_array=[15, 30]).add_to(m)
 
     return m
@@ -500,7 +499,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
     t_drone_arrival = st.session_state.t_launch + timedelta(seconds=fastest_t_out)
     sim_dur = max([d['t_total'] for d in valid]) if valid else 5
     
-    # Local cache to prevent flickering, resets perfectly on page load
     log_cache = [""] 
     
     def render_ui_state(curr_time, log_html_override=None):
@@ -526,7 +524,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
         else:
             log_html = log_html_override
             
-        # Using local cache so it persists accurately after sim completion
         if log_cache[0] != log_html:
             incident_placeholder.markdown(log_html, unsafe_allow_html=True)
             log_cache[0] = log_html
@@ -583,10 +580,10 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
             else:
                 if ui['specs']['model'].upper() == 'GUARDIAN':
                     phase_txt = "SWAPPING BATT"
-                    phase_col = "#39FF14" # Vibrant Neon Green
+                    phase_col = "#39FF14" 
                 else:
                     phase_txt = "RECHARGING"
-                    phase_col = "#FFC300" # Yellow
+                    phase_col = "#FFC300" 
                 
                 site_time = d['t_hov']
                 flight_prog = 0.0
