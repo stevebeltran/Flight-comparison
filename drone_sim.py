@@ -203,7 +203,7 @@ def get_full_recharge_time(model_name):
     mapping = {
         'RESPONDER': 25,
         'GUARDIAN': 1, 
-        'SKYDIO': 90,
+        '': 35,
         'MATRICE': 55
     }
     for key, val in mapping.items():
