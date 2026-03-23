@@ -26,7 +26,8 @@ if 'has_run_once' not in st.session_state: st.session_state.has_run_once = False
 if 'best_officer_sq' not in st.session_state: st.session_state.best_officer_sq = None
 if 't_officers' not in st.session_state: st.session_state.t_officers = None
 if 'last_processed_click' not in st.session_state: st.session_state.last_processed_click = None
-if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 16 
+# Changed default animation duration to 15 seconds
+if 'anim_duration' not in st.session_state: st.session_state.anim_duration = 15 
 
 # --- CUSTOM CSS: CLEAN COCKPIT THEME ---
 st.markdown("""
@@ -216,9 +217,16 @@ def get_full_recharge_time(model_name):
 def get_lat_lon_from_zip(zip_code):
     geolocator = Nominatim(user_agent="tactical_drone_command_ui_v3", timeout=10)
     try:
+        # First attempt: Strict structured query
         location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
         if location: 
             return [location.latitude, location.longitude]
+            
+        # Second attempt: Fallback string query for stubborn ZIPs like 61047
+        location_fallback = geolocator.geocode(f"{zip_code}, United States")
+        if location_fallback:
+            return [location_fallback.latitude, location_fallback.longitude]
+            
     except Exception as e:
         print(f"Geocode Error: {e}")
         return None
@@ -297,7 +305,10 @@ with mid_col:
             st.image("logo.png", use_container_width=True)
             
         if zip_in and len(zip_in) == 5:
-            coords = get_lat_lon_from_zip(zip_in)
+            # Added visual spinner during the geocoding process
+            with st.spinner("📡 Locating Target Zone..."):
+                coords = get_lat_lon_from_zip(zip_in)
+            
             if coords:
                 st.session_state.map_center = coords
                 st.session_state.map_zoom = 13 
@@ -601,7 +612,6 @@ if st.session_state.step == 3 and st.session_state.base and st.session_state.tar
                 t_min = int(current_recharge_min)
                 t_sec = int((current_recharge_min * 60) % 60)
                 
-                # Check for the Guardian model to adjust label
                 if ui['specs']['model'].upper() == 'GUARDIAN':
                     bat_label = "<span style='color: #ffffff;'>BATTERY SWAP</span>"
                 else:
