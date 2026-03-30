@@ -4,7 +4,7 @@ import folium
 from folium import plugins
 from folium.features import DivIcon
 from streamlit_folium import st_folium
-from geopy.geocoders import Nominatim
+import pgeocode
 import time
 import random
 import math
@@ -209,20 +209,18 @@ def get_full_recharge_time(model_name):
 
 @st.cache_data(show_spinner=False)
 def get_lat_lon_from_zip(zip_code):
-    geolocator = Nominatim(user_agent="tactical_drone_command_ui_v3", timeout=10)
-    try:
-        location = geolocator.geocode({"postalcode": zip_code, "country": "US"})
-        if location: 
-            return [location.latitude, location.longitude]
-            
-        location_fallback = geolocator.geocode(f"{zip_code}, United States")
-        if location_fallback:
-            return [location_fallback.latitude, location_fallback.longitude]
-            
-    except Exception as e:
-        print(f"Geocode Error: {e}")
+    zip_code = str(zip_code).strip()
+
+    if not zip_code.isdigit() or len(zip_code) != 5:
         return None
-    return None
+
+    nomi = pgeocode.Nominatim("us")
+    row = nomi.query_postal_code(zip_code)
+
+    if pd.isna(row.latitude) or pd.isna(row.longitude):
+        return None
+
+    return [float(row.latitude), float(row.longitude)]
 
 def get_distance_miles(p1, p2):
     return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**0.5 * 69
@@ -296,7 +294,7 @@ with mid_col:
         with logo_col:
             st.image("logo.png", use_container_width=True)
             
-        if zip_in and len(zip_in) == 5:
+        if zip_in and zip_in.isdigit() and len(zip_in) == 5:
             with st.spinner("📡 Locating Target Zone..."):
                 coords = get_lat_lon_from_zip(zip_in)
             
