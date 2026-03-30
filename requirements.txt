@@ -1,6 +1,7 @@
-streamlit>=1.32
-pandas>=2.0
-folium>=0.15
-streamlit-folium>=0.18
-pgeocode>=0.5.0
-streamlit-keyup>=0.2.4
+streamlit
+pandas
+numpy
+plotly
+folium
+streamlit-folium
+pgeocode
